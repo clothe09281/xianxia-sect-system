@@ -18,6 +18,14 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+
+// 👇👇👇 放在這裡 👇👇👇
+import banditImg from "../assets/monsters/monster_001.png";
+import goblinImg from "../assets/monsters/monster_002.png";
+import golemImg from "../assets/monsters/monster_003.png";
+import cyclopsImg from "../assets/monsters/monster_004.png";
+import tenguImg from "../assets/monsters/monster_005.png";
+
 import Papa from "papaparse";
 
 /** ✅ 通用 Modal：置中 + 背景變暗 + 點背景關閉 */
@@ -64,11 +72,11 @@ function Modal({ open, title, onClose, children, width = 860 }) {
 
 // ⚔️ 怪物名冊
 const MONSTERS = [
-  { id: "bandit", name: "山賊", hp: 30, xpWin: 12, cpWin: 6, coinWin: 5 },
-  { id: "goblin", name: "地精矮人", hp: 45, xpWin: 16, cpWin: 8, coinWin: 6 },
-  { id: "golem", name: "機關傀儡", hp: 65, xpWin: 22, cpWin: 10, coinWin: 8 },
-  { id: "cyclops", name: "獨眼巨人", hp: 90, xpWin: 30, cpWin: 14, coinWin: 10 },
-  { id: "tengu", name: "天狗", hp: 120, xpWin: 40, cpWin: 18, coinWin: 15 },
+  { id: "bandit", name: "山賊", hp: 30, xpWin: 12, cpWin: 6, coinWin: 5 , img: banditImg },
+  { id: "goblin", name: "地精矮人", hp: 45, xpWin: 16, cpWin: 8, coinWin: 6 , img: goblinImg },
+  { id: "golem", name: "機關傀儡", hp: 65, xpWin: 22, cpWin: 10, coinWin: 8 , img: golemImg },
+  { id: "cyclops", name: "獨眼巨人", hp: 90, xpWin: 30, cpWin: 14, coinWin: 10 , img: cyclopsImg },
+  { id: "tengu", name: "天狗", hp: 120, xpWin: 40, cpWin: 18, coinWin: 15 , img: tenguImg },
 ];
 
 function HPBar({ now, max }) {
@@ -183,17 +191,23 @@ const [importing, setImporting] = useState(false);
     return () => unsub();
   }, [classId]);
 
-  // ✅ achievements（全域清單）
+  // ✅ classes（班級底下清單）
   useEffect(() => {
-    // ⚠️ 依照 Excel/CSV 的排列順序顯示
-    const qA = query(collection(db, "achievements"), orderBy("order", "asc"));
-    const unsub = onSnapshot(
-      qA,
-      (snap) => setAchievements(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      (err) => console.error("achievements listen error:", err)
-    );
-    return () => unsub();
-  }, []);
+  if (!classId) return;
+
+  const qA = query(
+    collection(db, "classes", classId, "achievements"),
+    orderBy("order", "asc")
+  );
+
+  const unsub = onSnapshot(
+    qA,
+    (snap) => setAchievements(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error("achievements listen error:", err)
+  );
+
+  return () => unsub();
+}, [classId]);
 
   // ✅ 更新學生（統一出口）
   async function patchStudent(studentDocId, data) {
@@ -427,6 +441,7 @@ async function handleCSVFile(file) {
 }
 
 // 一鍵匯入：全部寫入 achievements
+
 async function importAchievementsToFirestore() {
   if (csvRows.length === 0) return alert("請先選擇 CSV 檔案");
   if (!user?.uid) return alert("請先登入老師帳號");
@@ -449,7 +464,7 @@ async function importAchievementsToFirestore() {
 
     csvRows.forEach((a) => {
       const id = makeId(a);
-      const ref = doc(db, "achievements", id);
+      const ref = doc(db, "classes", classId, "achievements", id);
 
       batch.set(ref, {
       order: a.order ?? 0,             // ✅ 重要：照檔案順序
@@ -477,24 +492,22 @@ async function importAchievementsToFirestore() {
   }
 }
 
-  // ✅ 授予成就、稱號（彈窗按鈕用）
+// ✅ 授予成就、稱號（彈窗按鈕用）
 async function grantAchievementToTarget(a) {
   if (!classId) return alert("classId 尚未載入");
   if (!targetStudentId) return alert("尚未指定要發成就的弟子");
 
-  const achievementId = a?.id; // achievements/{docId}
+  const achievementId = a?.id; // ✅ classes/{classId}/achievements/{achievementId}
   if (!achievementId) return alert("成就資料缺少 id");
 
   const title = String(a?.titleUnlock || "").trim(); // ✅ 可空白
 
   const patch = {
-    unlockedAchievements: arrayUnion(achievementId),
+    unlockedAchievements: arrayUnion(achievementId), // ✅ 只存 docId（最穩）
     updatedAt: serverTimestamp(),
   };
 
-  if (title) {
-    patch.unlockedTitles = arrayUnion(title);
-  }
+  if (title) patch.unlockedTitles = arrayUnion(title);
 
   await updateDoc(doc(db, "classes", classId, "students", targetStudentId), patch);
 
@@ -629,96 +642,176 @@ async function grantAchievementToTarget(a) {
         </tbody>
       </table>
 
-      {/* ===================== 歷練彈窗 ===================== */}
-      <Modal open={openRaid} title="⚔️ 歷練視窗" onClose={closeRaidModal} width={980}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ opacity: 0.9 }}>👹 選擇怪物：</div>
-          <select value={selectedMonsterId} onChange={(e) => setSelectedMonsterId(e.target.value)} style={{ padding: 8 }}>
-            {MONSTERS.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}（HP {m.hp}）</option>
-            ))}
-          </select>
+{/* ===================== 歷練彈窗 ===================== */}
+<Modal open={openRaid} title="⚔️ 歷練視窗" onClose={closeRaidModal} width={980}>
+  {/* 上方工具列 */}
+  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ opacity: 0.9 }}>👹 選擇怪物：</div>
 
-          {!showBattle ? (
-            <button className="rpg-btn" onClick={startRaid}>開始歷練</button>
-          ) : (
-            <button className="rpg-btn" onClick={() => { setShowBattle(false); setBattle(null); setRaidParticipants([]); setAnswererId(null); }}>
-              重新選怪物
-            </button>
+    <select
+      value={selectedMonsterId}
+      onChange={(e) => setSelectedMonsterId(e.target.value)}
+      style={{ padding: 8 }}
+    >
+      {MONSTERS.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.name}（HP {m.hp}）
+        </option>
+      ))}
+    </select>
+
+    {!showBattle ? (
+      <button className="rpg-btn" onClick={startRaid}>開始歷練</button>
+    ) : (
+      <button
+        className="rpg-btn"
+        onClick={() => {
+          setShowBattle(false);
+          setBattle(null);
+          setRaidParticipants([]);
+          setAnswererId(null);
+        }}
+      >
+        重新選怪物
+      </button>
+    )}
+  </div>
+
+  <div style={{ height: 14 }} />
+
+  {/* 作戰畫面 */}
+  {showBattle && battle?.monster ? (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      {/* 左側：怪物資訊 + 圖片 */}
+      <div
+        style={{
+          padding: 14,
+          border: "1px solid rgba(218,185,120,0.25)",
+          borderRadius: 10,
+          display: "grid",
+          gridTemplateColumns: "1fr 260px", // ✅ 右側留給圖片（你紅框的區域）
+          gap: 14,
+          alignItems: "center",
+        }}
+      >
+        {/* 左：怪物資訊 */}
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>👹 {battle.monster.name}</div>
+          <div style={{ marginTop: 10 }}>
+            <HPBar now={battle.hp ?? 0} max={battle.monster.hp ?? 100} />
+          </div>
+
+          {!answererId && (
+            <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>請先指定答題者</div>
           )}
+
+          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {(battle.hp ?? 0) > 0 ? (
+              <>
+                <button className="rpg-btn" onClick={answerCorrect} disabled={!answererId}>✅ 答對</button>
+                <button className="rpg-btn danger" onClick={answerWrong} disabled={!answererId}>❌ 答錯</button>
+              </>
+            ) : (
+              <button className="rpg-btn" onClick={finishWin}>🎉 勝利！領取獎勵</button>
+            )}
+          </div>
         </div>
 
-        <div style={{ height: 14 }} />
+        {/* 右：怪物圖片（紅框位置） */}
+        <div
+          style={{
+            width: 260,
+            height: 220,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 10,
+          }}
+        >
+          <img
+            src={battle.monster.img}
+            alt={battle.monster.name}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
+          />
+        </div>
+      </div>
 
-        {showBattle && battle?.monster ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div style={{ padding: 14, border: "1px solid rgba(218,185,120,0.25)", borderRadius: 10 }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>👹 {battle.monster.name}</div>
-              <div style={{ marginTop: 10 }}><HPBar now={battle.hp ?? 0} max={battle.monster.hp ?? 100} /></div>
+      {/* 右側：選參戰弟子 */}
+      <div style={{ padding: 14, border: "1px solid rgba(218,185,120,0.25)", borderRadius: 10 }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>🧑‍🎓 選參戰弟子</div>
 
-              {!answererId && <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>請先指定答題者</div>}
-
-              <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {(battle.hp ?? 0) > 0 ? (
-                  <>
-                    <button className="rpg-btn" onClick={answerCorrect} disabled={!answererId}>✅ 答對</button>
-                    <button className="rpg-btn danger" onClick={answerWrong} disabled={!answererId}>❌ 答錯</button>
-                  </>
-                ) : (
-                  <button className="rpg-btn" onClick={finishWin}>🎉 勝利！領取獎勵</button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ padding: 14, border: "1px solid rgba(218,185,120,0.25)", borderRadius: 10 }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>🧑‍🎓 選參戰弟子</div>
-
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰名單（勾選）</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  {students.map((s) => {
-                    const checked = raidParticipants.includes(s.id);
-                    return (
-                      <label key={s.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleRaidParticipant(s.id)} />
-                        {s.name}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰列表（指定答題者）</div>
-                {raidParticipants.length === 0 ? (
-                  <div style={{ opacity: 0.8, fontSize: 13 }}>尚未選擇參戰弟子</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {raidParticipants.map((sid) => {
-                      const s = students.find((x) => x.id === sid);
-                      if (!s) return null;
-                      return (
-                        <div key={sid} style={{ padding: 10, border: answererId === sid ? "1px solid rgba(218,185,120,0.85)" : "1px solid rgba(255,255,255,0.15)", borderRadius: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <input type="radio" name="answerer" checked={answererId === sid} onChange={() => setAnswererId(sid)} />
-                              <strong>{s.name}</strong>
-                            </label>
-                            <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.85 }}>Lv {s.level ?? 1}</span>
-                          </div>
-                          <div style={{ marginTop: 8 }}><HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} /></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰名單（勾選）</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {students.map((s) => {
+              const checked = raidParticipants.includes(s.id);
+              return (
+                <label key={s.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleRaidParticipant(s.id)} />
+                  {s.name}
+                </label>
+              );
+            })}
           </div>
-        ) : (
-          <div style={{ opacity: 0.8, fontSize: 13 }}>流程：按「歷練」→ 選怪物 → 「開始歷練」→ 進作戰畫面 → 再選參戰弟子</div>
-        )}
-      </Modal>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰列表（指定答題者）</div>
+
+          {raidParticipants.length === 0 ? (
+            <div style={{ opacity: 0.8, fontSize: 13 }}>尚未選擇參戰弟子</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {raidParticipants.map((sid) => {
+                const s = students.find((x) => x.id === sid);
+                if (!s) return null;
+
+                return (
+                  <div
+                    key={sid}
+                    style={{
+                      padding: 10,
+                      border: answererId === sid
+                        ? "1px solid rgba(218,185,120,0.85)"
+                        : "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="radio"
+                          name="answerer"
+                          checked={answererId === sid}
+                          onChange={() => setAnswererId(sid)}
+                        />
+                        <strong>{s.name}</strong>
+                      </label>
+                      <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.85 }}>
+                        Lv {s.level ?? 1}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div style={{ opacity: 0.8, fontSize: 13 }}>
+      流程：按「歷練」→ 選怪物 → 「開始歷練」→ 進作戰畫面 → 再選參戰弟子
+    </div>
+  )}
+</Modal>
 
       {/* ===================== 戰力榜彈窗 ===================== */}
       <Modal open={openRank} title="🏆 戰力榜" onClose={() => setOpenRank(false)} width={820}>

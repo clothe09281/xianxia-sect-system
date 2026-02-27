@@ -1,0 +1,27 @@
+UI 改成更直覺：
+
+如何把專案同步到 GitHub（換電腦完全不怕）
+
+
+🏅 成就系統 Firestore 結構設計
+
+🧧 妖丹兌換扣款規則（避免學生自己改金額）
+
+🛡️ 防止學生用 console 改資料的最強安全規則
+
+
+cd C:\Users\oreo\Desktop\class-rpg
+npm run dev
+npm install papaparse
+
+
+請幫我排除錯誤，並且能夠讓我直接複製貼上
+
+https://console.firebase.google.com/u/0/project/class601-e350f/firestore/databases/-default-/data
+
+老師  http://localhost:5173/login
+弟子  http://localhost:5173/student-login
+
+
+npm install
+npm run dev

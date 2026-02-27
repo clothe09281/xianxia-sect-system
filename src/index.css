@@ -1,0 +1,149 @@
+/* === 全站基礎設定 === */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Noto Serif TC", "標楷體", serif;
+
+  /* 深水墨夜色背景 */
+  background:
+    linear-gradient(
+      rgba(20, 20, 20, 0.65),
+      rgba(20, 20, 20, 0.65)
+    ),
+    url("https://images.unsplash.com/photo-1549880338-65ddcdfd017b");
+
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+/* === 水墨卷軸主容器 === */
+.scroll-box {
+  max-width: 460px;
+  margin: 80px auto;
+  padding: 28px 32px;
+
+  background: rgba(30, 30, 30, 0.85);
+  color: #f5f5f5;
+
+  border: 1px solid rgba(218, 185, 120, 0.6);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.4),
+    0 12px 30px rgba(0, 0, 0, 0.6);
+
+  border-radius: 6px;
+}
+/* === RPG Button Style（溫潤水墨版） === */
+.rpg-btn {
+  background: linear-gradient(to top, #ACA39C, #EDE9E9);
+  color: #3E352D;
+  border: 1px solid rgba(62, 53, 45, 0.45);
+  border-radius: 10px;           /* 👈 不那麼圓，偏卡片感 */
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 
+    0 4px 10px rgba(0,0,0,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  transition: 
+    transform 0.08s ease,
+    box-shadow 0.12s ease,
+    filter 0.15s ease;
+}
+
+.rpg-btn:hover {
+  filter: brightness(1.05);
+  box-shadow: 
+    0 6px 14px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.7);
+}
+
+.rpg-btn:active {
+  transform: translateY(1px);
+  box-shadow: 
+    0 3px 8px rgba(0,0,0,0.25),
+    inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* 表格用小按鈕 */
+.rpg-btn.sm {
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 8px;           /* 👈 小顆再方一點 */
+}
+
+.rpg-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
+/* === Danger Button（答錯 / 扣血） === */
+.rpg-btn.danger {
+  background: linear-gradient(to top, #9B7C78, #E6DADA);
+  color: #4A2E2A;
+  border-color: rgba(120, 60, 55, 0.5);
+}
+
+.rpg-btn.danger:hover {
+  background: linear-gradient(to top, #A88984, #EFE4E4);
+}
+
+.rpg-btn.danger:active {
+  background: linear-gradient(to top, #8A6A66, #DDD0D0);
+}
+
+/* === Pixel Click Feedback === */
+.rpg-btn {
+  position: relative;
+  overflow: hidden; /* 讓像素效果不溢出 */
+}
+
+/* 點擊瞬間的像素閃光 */
+.rpg-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255,255,255,0.25) 0px,
+      rgba(255,255,255,0.25) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 點擊時觸發 */
+.rpg-btn:active::after {
+  opacity: 0.35;
+}
+
+/* 像素抖動（非常輕微） */
+@keyframes pixel-press {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(1px, 0); }
+  50%  { transform: translate(-1px, 0); }
+  75%  { transform: translate(0, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+.rpg-btn:active {
+  animation: pixel-press 0.12s steps(2);
+}
+
+/* === Low HP Warning === */
+@keyframes hp-warning {
+  0%   { box-shadow: 0 0 0 rgba(180, 60, 50, 0); }
+  50%  { box-shadow: 0 0 6px rgba(180, 60, 50, 0.55); }
+  100% { box-shadow: 0 0 0 rgba(180, 60, 50, 0); }
+}
+
+.hp-danger {
+  animation: hp-warning 1.4s ease-in-out infinite;
+}

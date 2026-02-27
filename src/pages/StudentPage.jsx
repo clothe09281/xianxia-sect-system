@@ -7,6 +7,9 @@ import {
   getDoc,
   onSnapshot,
   updateDoc,
+  collection,
+  query,
+  orderBy,
   serverTimestamp,
 } from "firebase/firestore";
 
@@ -41,14 +44,65 @@ function HPBar({ now, max }) {
   );
 }
 
+/** ✅ 通用 Modal：置中 + 背景變暗 + 點背景關閉（跟老師頁同款） */
+function Modal({ open, title, onClose, children, width = 860 }) {
+  if (!open) return null;
+  return (
+    <div
+      onMouseDown={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: 16,
+      }}
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          width: `min(96vw, ${width}px)`,
+          maxHeight: "88vh",
+          overflow: "auto",
+          background: "rgba(20,20,20,0.92)",
+          color: "#fff",
+          border: "1px solid rgba(218,185,120,0.35)",
+          borderRadius: 10,
+          boxShadow: "0 18px 60px rgba(0,0,0,0.55)",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
+          <button className="rpg-btn" onClick={onClose}>關閉</button>
+        </div>
+        <div style={{ height: 12 }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function StudentPage() {
   const [msg, setMsg] = useState("");
   const [meIndex, setMeIndex] = useState(null); // users/{uid}
   const [student, setStudent] = useState(null); // classes/{classId}/students/{studentId}
   const [studentPath, setStudentPath] = useState(null); // { classId, studentId }
 
+  // ===== 學生成就/稱號彈窗 =====
+  const [openAchModal, setOpenAchModal] = useState(false);
+  const [achievements, setAchievements] = useState([]);
+
   const navigate = useNavigate();
 
+  // 方便用
+  const classId = studentPath?.classId || null;
+  const studentId = studentPath?.studentId || null;
+
+  // ✅ 登入 + 監聽自己的 student doc
   useEffect(() => {
     let unsubStudent = null;
 
@@ -63,7 +117,7 @@ export default function StudentPage() {
         return;
       }
 
-      // 讀 users/{uid} 看是否已認領
+      // 讀 users/{uid}
       const usnap = await getDoc(doc(db, "users", u.uid));
       if (!usnap.exists()) {
         setMsg("尚未建立學生索引（users/{uid}）。請回學生登入頁完成「註冊/認領」。");
@@ -83,13 +137,13 @@ export default function StudentPage() {
         return;
       }
 
-      const classId = ud.classId;
-      const studentId = ud.studentId;
-      setStudentPath({ classId, studentId });
+      const cid = ud.classId;
+      const sid = ud.studentId;
 
-      const sRef = doc(db, "classes", classId, "students", studentId);
+      setStudentPath({ classId: cid, studentId: sid });
 
-      // 即時監聽自己的弟子資料
+      const sRef = doc(db, "classes", cid, "students", sid);
+
       unsubStudent = onSnapshot(
         sRef,
         (s) => {
@@ -119,22 +173,40 @@ export default function StudentPage() {
     };
   }, [navigate]);
 
-  async function handleChangeActiveTitle(next) {
-    if (!studentPath) return;
+  // ✅ 讀取本班 achievements：classes/{classId}/achievements
+  useEffect(() => {
+    if (!classId) return;
 
-    const allowed = new Set(student?.unlockedTitles || []);
-    if (next && !allowed.has(next)) {
-      alert("此稱號尚未解鎖，無法選用。");
+    const qA = query(
+      collection(db, "classes", classId, "achievements"),
+      orderBy("order", "asc")
+    );
+
+    const unsub = onSnapshot(
+      qA,
+      (snap) => setAchievements(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("student achievements listen error:", err)
+    );
+
+    return () => unsub();
+  }, [classId]);
+
+  // ✅ 配戴稱號：只更新 activeTitle + updatedAt（符合 rules）
+  async function equipTitle(title) {
+    if (!classId || !studentId) return;
+
+    const next = String(title || "").trim();
+    const unlocked = Array.isArray(student?.unlockedTitles) ? student.unlockedTitles : [];
+
+    if (next !== "" && !unlocked.includes(next)) {
+      alert("此稱號尚未解鎖，不能配戴。");
       return;
     }
 
-    await updateDoc(
-      doc(db, "classes", studentPath.classId, "students", studentPath.studentId),
-      {
-        activeTitle: next || "",
-        updatedAt: serverTimestamp(),
-      }
-    );
+    await updateDoc(doc(db, "classes", classId, "students", studentId), {
+      activeTitle: next,
+      updatedAt: serverTimestamp(),
+    });
   }
 
   if (msg) {
@@ -143,6 +215,7 @@ export default function StudentPage() {
         <h2>學生頁</h2>
         <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{msg}</div>
         <div style={{ height: 12 }} />
+        <button className="rpg-btn" onClick={() => setOpenAchModal(true)}>🎖️ 成就稱號</button>{" "}
         <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
       </div>
     );
@@ -160,49 +233,104 @@ export default function StudentPage() {
   return (
     <div style={{ maxWidth: 860, margin: "60px auto", fontFamily: "sans-serif", color: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2>弟子面板</h2>
-        <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
+        <h2 style={{ margin: 0 }}>宗門弟子</h2>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
+        </div>
       </div>
 
-      {/* ✅ 稱號（學生可選） */}
-      <div style={{ marginTop: 12 }}>
-  <div style={{ fontWeight: 700, marginBottom: 6 }}>稱號（學生可選）</div>
+      {/* ✅ 成就稱號彈窗 */}
+      <Modal
+        open={openAchModal}
+        title={`🎖️ 成就稱號（目前：${student?.activeTitle || "未配戴"}）`}
+        onClose={() => setOpenAchModal(false)}
+        width={980}
+      >
+        <div style={{ opacity: 0.9, marginBottom: 10 }}>
+          ✅ 只有「已解鎖」的稱號才可配戴；配戴只會更新 <b>activeTitle</b>（符合 rules）
+        </div>
 
-  <select
-    value={student.activeTitle || ""}
-    onChange={async (e) => {
-      const next = String(e.target.value || "");
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "rgba(255,255,255,0.08)" }}>
+              <th style={{ textAlign: "left", padding: 10 }}>成就條件</th>
+              <th style={{ textAlign: "left", padding: 10 }}>成就名稱</th>
+              <th style={{ textAlign: "left", padding: 10 }}>解鎖稱號</th>
+              <th style={{ textAlign: "center", padding: 10, width: 220 }}>操作</th>
+            </tr>
+          </thead>
 
-      // ✅ 必須是已解鎖的稱號才可選（空字串代表不配戴）
-      const unlocked = Array.isArray(student.unlockedTitles) ? student.unlockedTitles : [];
-      const ok = next === "" || unlocked.includes(next);
+          <tbody>
+            {achievements.map((a) => {
+              const title = String(a.titleUnlock || "").trim();
 
-      if (!ok) {
-        alert("此稱號尚未解鎖，不能配戴。");
-        return;
-      }
+              const unlockedAchievements = Array.isArray(student?.unlockedAchievements)
+                ? student.unlockedAchievements
+                : [];
 
-      await updateDoc(doc(db, "classes", meIndex.classId, "students", meIndex.studentId), {
-        activeTitle: next,
-        updatedAt: serverTimestamp(),
-      });
-    }}
-    style={{ padding: 8, width: 260 }}
-  >
-    <option value="">（不配戴稱號）</option>
-    {(student.unlockedTitles || []).map((t) => (
-      <option key={t} value={t}>{t}</option>
-    ))}
-  </select>
+              // ✅ 兼容兩種格式：
+              // 1) 只存 id： "o058_...."
+              // 2) 存完整 key： "classes/{classId}/achievements/o058_...."
+              const key = `classes/${classId}/achievements/${a.id}`;
+              const unlocked = unlockedAchievements.includes(a.id) || unlockedAchievements.includes(key);
 
-  <div style={{ height: 10 }} />
+              const unlockedTitles = Array.isArray(student?.unlockedTitles) ? student.unlockedTitles : [];
 
-  <div style={{ fontSize: 12, opacity: 0.85 }}>
-    已解鎖成就：{Array.isArray(student.unlockedAchievements) ? student.unlockedAchievements.length : 0} 個
-    {(!student.unlockedTitles || student.unlockedTitles.length === 0) ? "（目前沒有可配戴稱號）" : ""}
-  </div>
-</div>
+              // ✅ 能配戴：成就已解鎖 + 有稱號 + 稱號已在 unlockedTitles
+              const canEquip = unlocked && !!title && unlockedTitles.includes(title);
 
+              const isEquipped = !!title && student?.activeTitle === title;
+
+              return (
+                <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
+                  <td style={{ padding: 10, opacity: unlocked ? 1 : 0.55 }}>
+                    {a.conditionText || "—"}
+                  </td>
+
+                  <td style={{ padding: 10, fontWeight: 700, opacity: unlocked ? 1 : 0.55 }}>
+                    {a.name || "—"} {!unlocked && <span style={{ marginLeft: 8, fontSize: 12 }}>（未解鎖）</span>}
+                  </td>
+
+                  <td style={{ padding: 10, fontWeight: 800, color: title ? "#FFD700" : "rgba(255,255,255,0.6)" }}>
+                    {title || "—"}
+                  </td>
+
+                  <td style={{ padding: 10, textAlign: "center" }}>
+                    {title ? (
+                      <button
+                        className="rpg-btn sm"
+                        onClick={() => equipTitle(isEquipped ? "" : title)}
+                        disabled={!canEquip}
+                        style={{
+                          opacity: canEquip ? 1 : 0.35,
+                          cursor: canEquip ? "pointer" : "not-allowed",
+                          filter: canEquip ? "none" : "grayscale(1)",
+                        }}
+                        title={
+                          !unlocked
+                            ? "未解鎖此成就"
+                            : !unlockedTitles.includes(title)
+                            ? "尚未解鎖此稱號"
+                            : isEquipped
+                            ? "點一下取消配戴"
+                            : "配戴稱號"
+                        }
+                      >
+                        {isEquipped ? "取消配戴" : "配戴"}
+                      </button>
+                    ) : (
+                      <span style={{ opacity: 0.6 }}></span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Modal>
+
+      {/* ✅ 弟子資訊卡 */}
       <div
         style={{
           marginTop: 14,
@@ -212,11 +340,11 @@ export default function StudentPage() {
           background: "rgba(20,20,20,0.85)",
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 800 }}>
+        <div style={{ fontSize: 30, fontWeight: 800 }}>
           {student.name}
           {student.activeTitle ? (
-            <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.85 }}>
-              「{student.activeTitle}」
+            <span style={{ marginLeft: 10, fontSize: 18, opacity: 10, color: "#ffd700" }}>
+              {student.activeTitle}
             </span>
           ) : null}
           <span style={{ fontSize: 14, opacity: 0.85, marginLeft: 10 }}>
@@ -229,16 +357,20 @@ export default function StudentPage() {
 
         <div style={{ height: 12 }} />
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.9 }}>
-          <div>修為：{student.xp ?? 0}</div>
-          <div>戰力：{student.cp ?? 0}</div>
-          <div>妖丹：{student.coin ?? 0}</div>
+          <div  style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
+          <div  style={{ fontSize: 20, fontWeight: 800 }}>戰力：{student.cp ?? 0}</div>
+          <div  style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
         </div>
 
         <div style={{ height: 10 }} />
         <div style={{ fontSize: 12, opacity: 0.7 }}>
           班級代碼：{meIndex?.classCode || "—"}　|　弟子ID：{meIndex?.studentId || "—"}
         </div>
-      </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+         <button className="rpg-btn" onClick={() => setOpenAchModal(true)}> 🎖️ 成就稱號</button>
+        </div>
     </div>
   );
 }

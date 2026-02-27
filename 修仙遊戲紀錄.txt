@@ -1,7 +1,3 @@
-UI 改成更直覺：
-
-如何把專案同步到 GitHub（換電腦完全不怕）
-
 或做「會動的怪物」版本
 
 攻擊時震動
@@ -10,8 +6,6 @@ UI 改成更直覺：
 🏅 成就系統 Firestore 結構設計
 
 🧧 妖丹兌換扣款規則（避免學生自己改金額）
-
-🛡️ 防止學生用 console 改資料的最強安全規則
 
 
 cd C:\Users\oreo\Desktop\class-rpg
@@ -27,5 +21,22 @@ https://console.firebase.google.com/u/0/project/class601-e350f/firestore/databas
 弟子  http://localhost:5173/student-login
 
 git add .
-git commit -m "更新：新增成就系統"
+git commit -m "更新："
 git push
+
+xianxia-sect-system
+
+班級成就
+achievements
+
+conditionText-"答題20次"-(string)
+
+metric-"answer"-(string)
+
+name-"初次運功"-(string)
+
+threshold-20-(number)
+
+tier-1-(number)
+
+titleUnlock-"小試牛刀"-(string)

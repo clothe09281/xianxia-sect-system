@@ -577,21 +577,36 @@ async function grantAchievementToTarget(a) {
           {students.map((s) => (
             <tr key={s.id} style={{ borderBottom: "1px solid #ddd" }}>
               <td style={{ padding: 10 }}>
-                {s.name}
-                <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+              <div style={{
+               fontSize: 20,
+               fontWeight: 700,
+               letterSpacing: 1,
+               color: "#fff"
+              }}>
+              {s.name}
+              <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
                   {s.authUid ? "（已認領）" : "（未認領）"}
                 </span>
                 {!!s.activeTitle && (
-                  <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.9 }}>
-                    稱號：<b>{s.activeTitle}</b>
-                  </span>
-                )}
+              <div style={{
+               marginTop: 6,
+               fontSize: 14,
+               fontWeight: 600,
+               color: "#ffd700",
+               background: "rgba(255,215,0,0.1)",
+               padding: "2px 8px",
+               borderRadius: 6,
+               display: "inline-block"
+              }}>稱號：{s.activeTitle}
+              </div>
+              )}
+              </div>
               </td>
-              <td align="center">{s.level ?? 1}</td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 700, color: "#ffcc66" }}>{s.level ?? 1}</div></td>
               <td align="center"><HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} /></td>
-              <td align="center">{s.xp ?? 0}</td>
-              <td align="center">{s.coin ?? 0}</td>
-              <td align="center">{s.cp ?? 0}</td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600 }}>{s.xp ?? 0}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600 }}>{s.coin ?? 0}</div></td>
+              <td align="center"><div style={{ fontSize: 20, fontWeight: 800, color: "#ff884d" }}>{s.cp ?? 0}</div></td>
               <td align="center">
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, 10)}>✅ 答對</button>{" "}
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, -5)}>❌ 答錯</button>{" "}
@@ -716,16 +731,106 @@ async function grantAchievementToTarget(a) {
             </tr>
           </thead>
           <tbody>
-            {students.map((s, idx) => (
-              <tr key={s.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
-                <td style={{ padding: 10 }}>{idx + 1}</td>
-                <td style={{ padding: 10 }}>
-                  {s.name} <span style={{ opacity: 0.8, fontSize: 12 }}>Lv {s.level ?? 1}</span>
-                </td>
-                <td style={{ padding: 10, textAlign: "right" }}>{s.cp ?? 0}</td>
-              </tr>
-            ))}
-          </tbody>
+  {students.map((s, idx) => {
+    const isTop1 = idx === 0;
+    const isTop2 = idx === 1;
+    const isTop3 = idx === 2;
+
+    return (
+      <tr
+        key={s.id}
+        style={{
+          borderBottom: "1px solid rgba(255,255,255,0.15)",
+          background:
+            isTop1
+              ? "rgba(255,215,0,0.08)"
+              : isTop2
+              ? "rgba(192,192,192,0.08)"
+              : isTop3
+              ? "rgba(205,127,50,0.08)"
+              : "transparent",
+        }}
+      >
+        {/* 排名 */}
+        <td style={{ padding: 12 }}>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: isTop1
+                ? "#FFD700"
+                : isTop2
+                ? "#C0C0C0"
+                : isTop3
+                ? "#CD7F32"
+                : "#fff",
+              textShadow: "0 0 6px rgba(255,215,0,0.6)"
+            }}
+          >
+            {idx + 1}
+          </div>
+        </td>
+
+        {/* 弟子 */}
+        <td style={{ padding: 12 }}>
+  {/* 名字 + 等級 同一行 */}
+  <div
+    style={{
+      fontSize: 18,
+      fontWeight: 800,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    }}
+  >
+    {s.name}
+
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 600,
+        background: "rgba(255,255,255,0.1)",
+        padding: "2px 8px",
+        borderRadius: 6,
+      }}
+    >
+      Lv {s.level ?? 1}
+    </span>
+
+    <span
+      style={{
+        marginTop: 6,
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#FFD700",
+        background: "rgba(255,215,0,0.08)",
+        padding: "2px 8px",
+        borderRadius: 6,
+        display: "inline-block",
+      }}
+    >
+      {s.activeTitle}
+      </span>
+  </div>
+        </td>
+
+        {/* 戰力 */}
+        <td style={{ padding: 12, textAlign: "right" }}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 900,
+              color: isTop1 ? "#ff884d" : "#ffcc66",
+              letterSpacing: 1,
+            }}
+          >
+            {s.cp ?? 0}
+          </div>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
         </table>
       </Modal>
 

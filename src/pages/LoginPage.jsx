@@ -117,8 +117,10 @@ export default function LoginPage() {
         }}
       >
 
-    <div className="scroll-box">
-      <h2>師尊登入</h2>
+    <div className="login-wrap">
+    <div className="login-card">
+      <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
+      <h2 style={{ marginBottom: 10 }}>師尊登入</h2>
       <p style={{ color: "#555" }}>第一次使用請先註冊（密碼至少 6 碼）。</p>
 
       <label>Email</label>
@@ -148,6 +150,8 @@ export default function LoginPage() {
       </div>
 
       {msg && <p style={{ marginTop: 14, color: "crimson" }}>{msg}</p>}
+    </div>
+    </div>
     </div>
     </div>
   );

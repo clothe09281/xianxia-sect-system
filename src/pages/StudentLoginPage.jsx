@@ -18,6 +18,7 @@ import {
   limit,
   runTransaction,
 } from "firebase/firestore";
+import bg from "../assets/bg-marble.jpg";
 
 function normName(s) {
   return (s ?? "").trim();
@@ -183,6 +184,24 @@ export default function StudentLoginPage() {
   }
 
   return (
+        <div
+          style={{
+            minHeight: "100vh",
+            backgroundImage: `url(${bg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+            color: "#fff",
+            position: "relative",
+          }}
+        >
+          {/* ✅ 跟老師頁面一樣的「框框卡片」 */}
+    <div className="login-wrap">
+    <div className="login-card">
+
     <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
       <h2 style={{ marginBottom: 10 }}>學生登入</h2>
 
@@ -255,6 +274,9 @@ export default function StudentLoginPage() {
           {busy ? "處理中..." : "註冊並認領弟子"}
         </button>
       )}
+    </div>
+    </div>
+    </div>
     </div>
   );
 }

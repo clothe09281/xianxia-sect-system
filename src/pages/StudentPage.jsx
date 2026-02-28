@@ -96,6 +96,13 @@ export default function StudentPage() {
   const [openAchModal, setOpenAchModal] = useState(false);
   const [achievements, setAchievements] = useState([]);
 
+  // ✅ 新增：靈寵 / 神兵 / 行囊 / 藏寶閣 / 時裝 彈窗
+const [openPetModal, setOpenPetModal] = useState(false);
+const [openWeaponModal, setOpenWeaponModal] = useState(false);
+const [openBagModal, setOpenBagModal] = useState(false);
+const [openTreasureModal, setOpenTreasureModal] = useState(false);
+const [openFashionModal, setOpenFashionModal] = useState(false);
+
   const navigate = useNavigate();
 
   // 方便用
@@ -235,7 +242,9 @@ export default function StudentPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h2 style={{ margin: 0 }}>宗門弟子</h2>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="rpg-btn" onClick={() => setOpenFashionModal(true)}>👘 時裝</button>
+          <button className="rpg-btn" onClick={() => setOpenTreasureModal(true)}>🏮 藏寶閣</button>
           <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
         </div>
       </div>
@@ -330,6 +339,41 @@ export default function StudentPage() {
         </table>
       </Modal>
 
+      {/* ✅ 靈寵彈窗 */}
+      <Modal open={openPetModal} title="🐾 靈寵" onClose={() => setOpenPetModal(false)} width={820}>
+        <div style={{ opacity: 0.9 }}>
+           這裡之後放「靈寵列表 / 裝備 / 升級」等內容（目前先占位）。
+        </div>
+      </Modal>
+
+      {/* ✅ 神兵彈窗 */}
+      <Modal open={openWeaponModal} title="⚔️ 神兵" onClose={() => setOpenWeaponModal(false)} width={820}>
+         <div style={{ opacity: 0.9 }}>
+           這裡之後放「神兵列表 / 強化 / 佩戴」等內容（目前先占位）。
+         </div>
+      </Modal>
+
+      {/* ✅ 背包彈窗 */}
+      <Modal open={openBagModal} title="🎒 行囊" onClose={() => setOpenBagModal(false)} width={820}>
+         <div style={{ opacity: 0.9 }}>
+           這裡之後放「道具、材料、消耗品」等內容（目前先占位）。
+         </div>
+      </Modal>
+
+      {/* ✅ 藏寶閣彈窗 */}
+      <Modal open={openTreasureModal} title="🏮 藏寶閣" onClose={() => setOpenTreasureModal(false)} width={820}>
+         <div style={{ opacity: 0.9 }}>
+           這裡之後放「妖丹兌換、商城」等內容（目前先占位）。
+         </div>
+      </Modal>
+
+      {/* ✅ 時裝彈窗 */}
+      <Modal open={openFashionModal} title="👘 時裝" onClose={() => setOpenFashionModal(false)} width={820}>
+        <div style={{ opacity: 0.9 }}>
+           這裡之後放「時裝清單 / 試穿 / 套用外觀」等內容（目前先占位）。
+        </div>
+      </Modal>
+
       {/* ✅ 弟子資訊卡 */}
       <div
         style={{
@@ -368,8 +412,11 @@ export default function StudentPage() {
         </div>
         </div>
 
-        <div style={{ marginTop: 14 }}>
-         <button className="rpg-btn" onClick={() => setOpenAchModal(true)}> 🎖️ 成就稱號</button>
+        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap"  }}>
+         <button className="rpg-btn" onClick={() => setOpenAchModal(true)}>🎖️ 成就稱號</button>
+         <button className="rpg-btn" onClick={() => setOpenPetModal(true)}>🐾 靈寵</button>
+         <button className="rpg-btn" onClick={() => setOpenWeaponModal(true)}>⚔️ 神兵</button>
+         <button className="rpg-btn" onClick={() => setOpenBagModal(true)}>🎒 行囊</button>
         </div>
     </div>
   );

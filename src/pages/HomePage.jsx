@@ -1,28 +1,62 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import bg from "../assets/bg-marble.jpg";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setShow(true), 100);
+  }, []);
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg,#1a1a1a,#0f0f0f)",
-        color: "#fff",
+        backgroundImage: `url(${bg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 30,
-        fontFamily: "sans-serif",
+        flexDirection: "column",
+        color: "#fff",
+        position: "relative",
       }}
     >
-      <h1 style={{ fontSize: 36 }}>宗門修仙名錄</h1>
-      <p style={{ opacity: 0.8 }}>
+      {/* 遮罩 */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(0,0,0,0.55)",
+        }}
+      />
+
+      {/* 內容區 */}
+      <div
+        style={{
+          position: "relative",
+          textAlign: "center",
+          opacity: show ? 1 : 0,
+          transform: show ? "translateY(0)" : "translateY(20px)",
+          transition: "all 1.2s ease",
+        }}
+      >
+
+      <h1 style={{ fontSize: 100,
+            fontWeight: 800,
+            background: "linear-gradient(180deg,#FFD700,#C8A951)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            letterSpacing: 4,
+            marginBottom: 10, }}>宗門修仙名錄</h1>
+      <p style={{ opacity: 0.85, marginBottom: 40 }}>
         RPG 化班級經營系統
       </p>
 
-      <div style={{ display: "flex", gap: 20 }}>
+      <div style={{ display: "flex", gap: 24, justifyContent: "center" }}>
         <button
           className="rpg-btn"
           onClick={() => navigate("/login")}
@@ -37,6 +71,7 @@ export default function HomePage() {
           🧑‍🎓 我是弟子
         </button>
       </div>
+    </div>
     </div>
   );
 }

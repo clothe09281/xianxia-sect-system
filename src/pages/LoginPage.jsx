@@ -16,6 +16,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import bg from "../assets/bg-marble.jpg";
 
 // 產生班級代碼：6碼（大寫+數字）
 function genClassCode(len = 6) {
@@ -101,6 +102,21 @@ export default function LoginPage() {
   }
 
   return (
+      <div
+        style={{
+          minHeight: "100vh",
+          backgroundImage: `url(${bg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          color: "#fff",
+          position: "relative",
+        }}
+      >
+
     <div className="scroll-box">
       <h2>師尊登入</h2>
       <p style={{ color: "#555" }}>第一次使用請先註冊（密碼至少 6 碼）。</p>
@@ -132,6 +148,7 @@ export default function LoginPage() {
       </div>
 
       {msg && <p style={{ marginTop: 14, color: "crimson" }}>{msg}</p>}
+    </div>
     </div>
   );
 }

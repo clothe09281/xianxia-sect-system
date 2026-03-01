@@ -13,10 +13,12 @@ import {
   serverTimestamp,
   runTransaction
 } from "firebase/firestore";
-
-// 🏮 藏寶閣商品
+//藏寶閣
 import TreasureShop from "../components/TreasureShop";
 import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
+// 背包行囊
+import BackpackModal from "../components/BackpackModal";
+
 
 function HPBar({ now, max }) {
   const safeMax = Math.max(1, Number(max ?? 100));
@@ -104,10 +106,13 @@ export default function StudentPage() {
   // ===== 藏寶閣彈窗（學生頁）=====
 const [openTreasure, setOpenTreasure] = useState(false);
 
+  // ===== 背包彈窗 + 背包資料 =====
+const [openBag, setOpenBag] = useState(false);
+const [bagItems, setBagItems] = useState([]);
+
   // ✅ 新增：靈寵 / 神兵 / 行囊 / 藏寶閣 / 時裝 彈窗
 const [openPetModal, setOpenPetModal] = useState(false);
 const [openWeaponModal, setOpenWeaponModal] = useState(false);
-const [openBagModal, setOpenBagModal] = useState(false);
 const [openFashionModal, setOpenFashionModal] = useState(false);
 
   const navigate = useNavigate();
@@ -205,6 +210,41 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
     return () => unsub();
   }, [classId]);
 
+ // ✅ 監聽背包：classes/{classId}/students/{studentId}/inventory
+useEffect(() => {
+  if (!studentPath?.classId || !studentPath?.studentId) return;
+
+  const invCol = collection(
+    db,
+    "classes",
+    studentPath.classId,
+    "students",
+    studentPath.studentId,
+    "inventory"
+  );
+
+  const unsub = onSnapshot(
+    invCol,
+    (snap) => {
+      const arr = snap.docs.map((d) => {
+        const data = d.data() || {};
+        return {
+          id: d.id,                         // itemId（docId）
+          name: data.name || "",
+          category: data.category || "card", // pet/weapon/card/equip/fashion
+          icon: data.icon || "",
+          qty: Number(data.qty || 0),
+        };
+      });
+
+      setBagItems(arr.filter((x) => x.qty > 0));
+    },
+    (err) => console.error("inventory listen error:", err)
+  );
+
+  return () => unsub();
+}, [studentPath?.classId, studentPath?.studentId]);
+
   // ✅ 配戴稱號：只更新 activeTitle + updatedAt（符合 rules）
   async function equipTitle(title) {
     if (!classId || !studentId) return;
@@ -223,42 +263,78 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
     });
   }
 
-  // ✅ 藏寶閣：學生購買
-  async function handleStudentBuy({ tabKey, item, price }) {
+ // ✅ 藏寶閣：學生購買（扣妖丹 + 寫入 students/{id}/inventory/{itemId}）
+async function handleStudentBuy({ tabKey, item, price }) {
   if (!studentPath?.classId || !studentPath?.studentId) {
     alert("尚未取得 studentPath");
     return;
   }
 
-  const sRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId);
+  const classId = studentPath.classId;
+  const studentId = studentPath.studentId;
+
+  // 1) 學生主檔
+  const sRef = doc(db, "classes", classId, "students", studentId);
+
+  // 2) 背包子集合：用 item.id 當 docId（重複購買就累加 qty）
+  const invRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
+
+  // 3) 分類 mapping：你的商店 privilege → 背包 card
+  const category =
+    tabKey === "pet"
+      ? "pet"
+      : tabKey === "weapon"
+      ? "weapon"
+      : tabKey === "privilege"
+      ? "card"
+      : tabKey === "card"
+      ? "card"
+      : tabKey === "equip"
+      ? "equip"
+      : tabKey === "fashion"
+      ? "fashion"
+      : "card";
 
   try {
     await runTransaction(db, async (tx) => {
-      const snap = await tx.get(sRef);
-      if (!snap.exists()) throw new Error("找不到學生資料");
+      // 先讀學生 coin
+      const sSnap = await tx.get(sRef);
+      if (!sSnap.exists()) throw new Error("找不到學生資料");
 
-      const data = snap.data() || {};
-      const coinNow = Number(data.coin || 0);
+      const sData = sSnap.data() || {};
+      const coinNow = Number(sData.coin || 0);
       const cost = Number(price || 0);
 
+      if (cost <= 0) throw new Error("商品金額異常");
       if (coinNow < cost) throw new Error("妖丹不足，無法購買");
 
-      const inv = data.inventory || {};
-      const invTab = inv[tabKey] || {};
-      const oldQty = Number(invTab[item.id] || 0);
-      const newQty = oldQty + 1;
+      // 再讀背包該 item（看看有沒有買過）
+      const invSnap = await tx.get(invRef);
 
+      // 扣妖丹
       tx.update(sRef, {
         coin: coinNow - cost,
-        inventory: {
-          ...inv,
-          [tabKey]: {
-            ...invTab,
-            [item.id]: newQty,
-          },
-        },
         updatedAt: serverTimestamp(),
       });
+
+      // 寫入/累加背包
+      if (!invSnap.exists()) {
+        tx.set(invRef, {
+          itemId: item.id,
+          name: item.name || "",
+          category,                 // pet / weapon / card / equip / fashion
+          icon: item.icon || "",    // 你如果不想存也可以拿掉
+          qty: 1,
+          acquiredAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        const oldQty = Number(invSnap.data()?.qty || 0);
+        tx.update(invRef, {
+          qty: oldQty + 1,
+          updatedAt: serverTimestamp(),
+        });
+      }
     });
 
     alert(`✅ 購買成功：${item.name}（-${price} 妖丹）`);
@@ -406,11 +482,12 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
       </Modal>
 
       {/* ✅ 背包彈窗 */}
-      <Modal open={openBagModal} title="🎒 行囊" onClose={() => setOpenBagModal(false)} width={820}>
-         <div style={{ opacity: 0.9 }}>
-           這裡之後放「道具、材料、消耗品」等內容（目前先占位）。
-         </div>
-      </Modal>
+      <BackpackModal
+  open={openBag}
+  onClose={() => setOpenBag(false)}
+  items={bagItems}
+  slotsPerTab={24}
+/>
 
       {/* ✅ 藏寶閣彈窗 */}
       <TreasureShop
@@ -471,7 +548,7 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
          <button className="rpg-btn" onClick={() => setOpenAchModal(true)}>🎖️ 成就稱號</button>
          <button className="rpg-btn" onClick={() => setOpenPetModal(true)}>🐾 靈寵</button>
          <button className="rpg-btn" onClick={() => setOpenWeaponModal(true)}>⚔️ 神兵</button>
-         <button className="rpg-btn" onClick={() => setOpenBagModal(true)}>🎒 行囊</button>
+         <button className="rpg-btn" onClick={() => setOpenBag(true)}>🎒 行囊</button>
         </div>
     </div>
   );

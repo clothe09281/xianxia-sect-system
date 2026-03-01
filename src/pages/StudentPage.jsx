@@ -11,7 +11,12 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  runTransaction
 } from "firebase/firestore";
+
+// 🏮 藏寶閣商品
+import TreasureShop from "../components/TreasureShop";
+import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
 
 function HPBar({ now, max }) {
   const safeMax = Math.max(1, Number(max ?? 100));
@@ -96,11 +101,13 @@ export default function StudentPage() {
   const [openAchModal, setOpenAchModal] = useState(false);
   const [achievements, setAchievements] = useState([]);
 
+  // ===== 藏寶閣彈窗（學生頁）=====
+const [openTreasure, setOpenTreasure] = useState(false);
+
   // ✅ 新增：靈寵 / 神兵 / 行囊 / 藏寶閣 / 時裝 彈窗
 const [openPetModal, setOpenPetModal] = useState(false);
 const [openWeaponModal, setOpenWeaponModal] = useState(false);
 const [openBagModal, setOpenBagModal] = useState(false);
-const [openTreasureModal, setOpenTreasureModal] = useState(false);
 const [openFashionModal, setOpenFashionModal] = useState(false);
 
   const navigate = useNavigate();
@@ -216,6 +223,51 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
     });
   }
 
+  // ✅ 藏寶閣：學生購買
+  async function handleStudentBuy({ tabKey, item, price }) {
+  if (!studentPath?.classId || !studentPath?.studentId) {
+    alert("尚未取得 studentPath");
+    return;
+  }
+
+  const sRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId);
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(sRef);
+      if (!snap.exists()) throw new Error("找不到學生資料");
+
+      const data = snap.data() || {};
+      const coinNow = Number(data.coin || 0);
+      const cost = Number(price || 0);
+
+      if (coinNow < cost) throw new Error("妖丹不足，無法購買");
+
+      const inv = data.inventory || {};
+      const invTab = inv[tabKey] || {};
+      const oldQty = Number(invTab[item.id] || 0);
+      const newQty = oldQty + 1;
+
+      tx.update(sRef, {
+        coin: coinNow - cost,
+        inventory: {
+          ...inv,
+          [tabKey]: {
+            ...invTab,
+            [item.id]: newQty,
+          },
+        },
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    alert(`✅ 購買成功：${item.name}（-${price} 妖丹）`);
+  } catch (e) {
+    alert(e?.message || "購買失敗");
+  }
+}
+
+
   if (msg) {
     return (
       <div style={{ maxWidth: 860, margin: "60px auto", fontFamily: "sans-serif", color: "#fff" }}>
@@ -244,7 +296,7 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button className="rpg-btn" onClick={() => setOpenFashionModal(true)}>👘 時裝</button>
-          <button className="rpg-btn" onClick={() => setOpenTreasureModal(true)}>🏮 藏寶閣</button>
+          <button className="rpg-btn" onClick={() => setOpenTreasure(true)}>🏮 藏寶閣</button>
           <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
         </div>
       </div>
@@ -361,11 +413,14 @@ const [openFashionModal, setOpenFashionModal] = useState(false);
       </Modal>
 
       {/* ✅ 藏寶閣彈窗 */}
-      <Modal open={openTreasureModal} title="🏮 藏寶閣" onClose={() => setOpenTreasureModal(false)} width={820}>
-         <div style={{ opacity: 0.9 }}>
-           這裡之後放「妖丹兌換、商城」等內容（目前先占位）。
-         </div>
-      </Modal>
+      <TreasureShop
+  open={openTreasure}
+  onClose={() => setOpenTreasure(false)}
+  mode="student"
+  items={SHOP_ITEMS}
+  coin={student?.coin ?? 0} // ✅ 建議保留，才能判斷買不買得起 & 顯示妖丹
+  onBuy={handleStudentBuy}
+/>
 
       {/* ✅ 時裝彈窗 */}
       <Modal open={openFashionModal} title="👘 時裝" onClose={() => setOpenFashionModal(false)} width={820}>

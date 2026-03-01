@@ -61,7 +61,7 @@ export default function HomePage() {
           className="rpg-btn"
           onClick={() => navigate("/login")}
         >
-          🧑‍🏫 我是老師
+          🧑‍🏫 我是師尊
         </button>
 
         <button

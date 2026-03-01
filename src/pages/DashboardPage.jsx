@@ -19,12 +19,16 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
-// 👇👇👇 放在這裡 👇👇👇
+// 👇👇👇 MONSTERS 放在這裡 👇👇👇
 import banditImg from "../assets/monsters/monster_001.png";
 import goblinImg from "../assets/monsters/monster_002.png";
 import golemImg from "../assets/monsters/monster_003.png";
 import cyclopsImg from "../assets/monsters/monster_004.png";
 import tenguImg from "../assets/monsters/monster_005.png";
+
+// 🏮 藏寶閣商品
+import TreasureShop from "../components/TreasureShop";
+import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
 
 import Papa from "papaparse";
 
@@ -94,6 +98,7 @@ function HPBar({ now, max }) {
     </div>
   );
 }
+
 
 // ✅ 用 users/{uid} 判斷老師
 async function ensureTeacherRole(user) {
@@ -244,6 +249,13 @@ const [importing, setImporting] = useState(false);
       unlockedTitles: [],
       unlockedAchievements: [],
       activeTitle: "",
+
+      // ✅ 背包初始化（建議）
+      inventory: {
+  pet: {},
+  weapon: {},
+  privilege: {},
+},
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -560,17 +572,7 @@ async function grantAchievementToTarget(a) {
           placeholder="新增弟子姓名（例如：花前）"
         />
         <button className="rpg-btn sm" onClick={addStudent}>新增弟子</button>
-        <button className="rpg-btn sm" onClick={healAllStudentsFull}>🔥 全班回滿血</button>
-      </div>
-
-      {/* 老師指定怪物 */}
-      <div style={{ display: "flex", gap: 10, margin: "18px 0", alignItems: "center" }}>
-        <div style={{ color: "#333" }}>老師指定怪物：</div>
-        <select value={selectedMonsterId} onChange={(e) => setSelectedMonsterId(e.target.value)} style={{ padding: 8 }}>
-          {MONSTERS.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}（HP {m.hp}）</option>
-          ))}
-        </select>
+        <button className="rpg-btn sm" onClick={healAllStudentsFull}>🔥 全班滿血</button>
       </div>
 
       {/* 主畫面 table */}
@@ -982,11 +984,13 @@ async function grantAchievementToTarget(a) {
       </Modal>
 
       {/* ===================== 藏寶閣彈窗 ===================== */}
-      <Modal open={openTreasure} title="🏮 藏寶閣（妖丹兌換）" onClose={() => setOpenTreasure(false)} width={820}>
-        <div style={{ opacity: 0.9 }}>
-          占位：之後你告訴我要兌換的項目，我再幫你把扣妖丹流程接好。
-        </div>
-      </Modal>
+      <TreasureShop
+  open={openTreasure}
+  onClose={() => setOpenTreasure(false)}
+  mode="teacher"
+  items={SHOP_ITEMS}
+/>
+
       {/* ===================== 匯入成就彈窗 ===================== */}
       <Modal
   open={openImportAch}

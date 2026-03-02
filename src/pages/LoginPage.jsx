@@ -16,7 +16,6 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import bg from "../assets/bg-marble.jpg";
 
 // 產生班級代碼：6碼（大寫+數字）
 function genClassCode(len = 6) {
@@ -105,7 +104,7 @@ export default function LoginPage() {
       <div
         style={{
           minHeight: "100vh",
-          backgroundImage: `url(${bg})`,
+          backgroundImage: 'url("/background.jpg")',
           backgroundSize: "cover",
           backgroundPosition: "center",
           display: "flex",

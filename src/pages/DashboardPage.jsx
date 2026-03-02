@@ -20,11 +20,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 // 👇👇👇 MONSTERS 放在這裡 👇👇👇
-import banditImg from "../assets/monsters/monster_001.png";
-import goblinImg from "../assets/monsters/monster_002.png";
-import golemImg from "../assets/monsters/monster_003.png";
-import cyclopsImg from "../assets/monsters/monster_004.png";
-import tenguImg from "../assets/monsters/monster_005.png";
+
 
 // 🏮 藏寶閣商品
 import TreasureShop from "../components/TreasureShop";
@@ -76,11 +72,11 @@ function Modal({ open, title, onClose, children, width = 860 }) {
 
 // ⚔️ 怪物名冊
 const MONSTERS = [
-  { id: "bandit", name: "山賊", hp: 30, xpWin: 12, cpWin: 6, coinWin: 5 , img: banditImg },
-  { id: "goblin", name: "地精矮人", hp: 45, xpWin: 16, cpWin: 8, coinWin: 6 , img: goblinImg },
-  { id: "golem", name: "機關傀儡", hp: 65, xpWin: 22, cpWin: 10, coinWin: 8 , img: golemImg },
-  { id: "cyclops", name: "獨眼巨人", hp: 90, xpWin: 30, cpWin: 14, coinWin: 10 , img: cyclopsImg },
-  { id: "tengu", name: "天狗", hp: 120, xpWin: 40, cpWin: 18, coinWin: 15 , img: tenguImg },
+  { id: "bandit", name: "山賊", hp: 30, xpWin: 12, cpWin: 6, coinWin: 5, img: "/monsters/monster_001.png" },
+  { id: "goblin", name: "地精矮人", hp: 45, xpWin: 16, cpWin: 8, coinWin: 6, img: "/monsters/monster_002.png" },
+  { id: "golem", name: "機關傀儡", hp: 65, xpWin: 22, cpWin: 10, coinWin: 8, img: "/monsters/monster_003.png" },
+  { id: "cyclops", name: "獨眼巨人", hp: 90, xpWin: 30, cpWin: 14, coinWin: 10, img: "/monsters/monster_004.png" },
+  { id: "tengu", name: "天狗", hp: 120, xpWin: 40, cpWin: 18, coinWin: 15, img: "/monsters/monster_005.png" },
 ];
 
 function HPBar({ now, max }) {

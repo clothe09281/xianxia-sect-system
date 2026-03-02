@@ -18,7 +18,6 @@ import {
   limit,
   runTransaction,
 } from "firebase/firestore";
-import bg from "../assets/bg-marble.jpg";
 
 function normName(s) {
   return (s ?? "").trim();
@@ -187,7 +186,7 @@ export default function StudentLoginPage() {
         <div
           style={{
             minHeight: "100vh",
-            backgroundImage: `url(${bg})`,
+            backgroundImage: 'url("/background.jpg")',
             backgroundSize: "cover",
             backgroundPosition: "center",
             display: "flex",

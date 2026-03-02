@@ -182,7 +182,7 @@ export default function TreasureShop({
               >
                 {it.icon ? (
                   <img
-                    src={it.icon}
+                    src={it.icon} 
                     alt={it.name}
                     style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />

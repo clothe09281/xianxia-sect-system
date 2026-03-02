@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import bg from "../assets/bg-marble.jpg";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -14,7 +13,7 @@ export default function HomePage() {
     <div
       style={{
         minHeight: "100vh",
-        backgroundImage: `url(${bg})`,
+        backgroundImage:'url("/background.jpg")',
         backgroundSize: "cover",
         backgroundPosition: "center",
         display: "flex",

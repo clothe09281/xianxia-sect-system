@@ -319,15 +319,18 @@ async function handleStudentBuy({ tabKey, item, price }) {
 
       // 寫入/累加背包
       if (!invSnap.exists()) {
-        tx.set(invRef, {
-          itemId: item.id,
-          name: item.name || "",
-          category,                 // pet / weapon / card / equip / fashion
-          icon: item.icon || "",    // 你如果不想存也可以拿掉
-          qty: 1,
-          acquiredAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+        const safeIcon = String(item.icon || "");
+const iconToStore = safeIcon.startsWith("/") ? safeIcon : ""; // 只存 /merchandise/xxx.png 這種
+
+tx.set(invRef, {
+  itemId: item.id,
+  name: item.name || "",
+  category,
+  icon: iconToStore,
+  qty: 1,
+  acquiredAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+});
       } else {
         const oldQty = Number(invSnap.data()?.qty || 0);
         tx.update(invRef, {

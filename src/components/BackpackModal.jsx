@@ -119,54 +119,64 @@ export default function BackpackModal({
           gap: 10,
         }}
       >
-        {slots.map((it, idx) => (
-          <div
-            key={it?.id ? it.id : `empty-${idx}`}
-            style={{
-              height: 86,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(255,255,255,0.04)",
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-            title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
-          >
-            {!it ? (
-              <div style={{ opacity: 0.25, fontSize: 12 }}>空</div>
-            ) : (
-              <>
-                {it.icon ? (
-                  <img
-                    src={it.icon}
-                    alt={it.name}
-                    style={{ width: "82%", height: "82%", objectFit: "contain" }}
-                  />
-                ) : (
-                  <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
-                )}
+        {slots.map((it, idx) => {
+  const src =
+    it && typeof it.icon === "string" && it.icon.startsWith("/")
+      ? it.icon
+      : "";
 
-                {/* 右下角數量 */}
-                <div
-                  style={{
-                    position: "absolute",
-                    right: 8,
-                    bottom: 6,
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: "#ffcc66",
-                    textShadow: "0 2px 6px rgba(0,0,0,0.6)",
-                  }}
-                >
-                  x{it.qty ?? 1}
-                </div>
-              </>
-            )}
+  return (
+    <div
+      key={it?.id ? it.id : `empty-${idx}`}
+      style={{
+        height: 86,
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.14)",
+        background: "rgba(255,255,255,0.04)",
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+      title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
+    >
+      {!it ? (
+        <div style={{ opacity: 0.25, fontSize: 12 }}>空</div>
+      ) : (
+        <>
+          {src ? (
+            <img
+              src={src}
+              alt={it.name}
+              style={{
+                width: "82%",
+                height: "82%",
+                objectFit: "contain",
+              }}
+            />
+          ) : (
+            <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
+          )}
+
+          <div
+            style={{
+              position: "absolute",
+              right: 8,
+              bottom: 6,
+              fontSize: 12,
+              fontWeight: 900,
+              color: "#ffcc66",
+              textShadow: "0 2px 6px rgba(0,0,0,0.6)",
+            }}
+          >
+            x{it.qty ?? 1}
           </div>
-        ))}
+        </>
+      )}
+    </div>
+  );
+})}
       </div>
 
       <div style={{ height: 10 }} />

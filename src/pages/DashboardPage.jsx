@@ -533,6 +533,31 @@ async function grantAchievementToTarget(a) {
   );
 }
 
+//數字排序
+const sortedStudents = [...students].sort((a, b) => {
+  const getLeadingNumber = (name) => {
+    const match = String(name || "").match(/^(\d+)/);
+    return match ? Number(match[1]) : null;
+  };
+
+  const aNum = getLeadingNumber(a.name);
+  const bNum = getLeadingNumber(b.name);
+
+  // 兩個都有數字 → 比數字
+  if (aNum !== null && bNum !== null) {
+    return aNum - bNum;
+  }
+
+  // 只有 a 有數字 → a 在前
+  if (aNum !== null) return -1;
+
+  // 只有 b 有數字 → b 在前
+  if (bNum !== null) return 1;
+
+  // 都沒有數字 → 用中文排序
+  return String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant");
+});
+
   // achievements 排序：優先用 threshold（若有），沒有就不排序
   const achievementsSorted = useMemo(() => {
   const arr = [...achievements];
@@ -540,7 +565,7 @@ async function grantAchievementToTarget(a) {
   return arr;
 }, [achievements]);
 
-  const top3 = useMemo(() => students.slice(0, 3), [students]);
+  const top3 = useMemo(() => sortedStudents.slice(0, 3), [sortedStudents]);
 
   return (
     <div style={{ width: "min(1400px, 96vw)", margin: "40px auto", fontFamily: "sans-serif" }}>
@@ -589,7 +614,7 @@ async function grantAchievementToTarget(a) {
           </tr>
         </thead>
         <tbody>
-          {students.map((s) => (
+          {sortedStudents.map((s) => (
             <tr key={s.id} style={{ borderBottom: "1px solid #ddd" }}>
               <td style={{ padding: 10 }}>
               <div style={{

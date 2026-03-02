@@ -115,13 +115,10 @@ export default function TreasureShop({
     return arr.filter((x) => x?.tab === tab);
   }, [items, tab]);
 
-  async function handleBuy(item) {
-    if (onBuy) {
-      return onBuy(item);
-    }
-    // Demo fallback（不寫入後台）
-    alert(`（展示）點擊購買：${item.name}，價格：${item.price}`);
-  }
+  async function handleBuy(payload) {
+  if (onBuy) return onBuy(payload);
+  alert("未提供 onBuy，僅展示");
+}
 
   return (
     <Modal open={open} title={title} onClose={onClose} width={width}>
@@ -209,9 +206,12 @@ export default function TreasureShop({
               </div>
 
               {/* 右：按鈕 */}
-              <button className="rpg-btn sm" onClick={() => handleBuy(it)}>
-                購買
-              </button>
+              <button
+  className="rpg-btn sm"
+  onClick={() => handleBuy({ tabKey: tab, item: it, price: it.price })}
+>
+  購買
+</button>
             </div>
           ))}
         </div>

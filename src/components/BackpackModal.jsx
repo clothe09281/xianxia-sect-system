@@ -142,22 +142,26 @@ export default function BackpackModal({
       title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
     >
       {!it ? (
-        <div style={{ opacity: 0.25, fontSize: 12 }}>空</div>
+        <div style={{ opacity: 0.25, fontSize: 12 }}></div>
       ) : (
         <>
           {src ? (
-            <img
-              src={src}
-              alt={it.name}
-              style={{
-                width: "82%",
-                height: "82%",
-                objectFit: "contain",
-              }}
-            />
-          ) : (
-            <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
-          )}
+  <img
+    src={src}
+    alt={it.name}
+    style={{
+      width: "82%",
+      height: "82%",
+      objectFit: "contain",
+    }}
+    onError={(e) => {
+      console.log("❌ 背包圖片載入失敗：", src, it);
+      e.currentTarget.style.display = "none";
+    }}
+  />
+) : (
+  <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
+)}
 
           <div
             style={{

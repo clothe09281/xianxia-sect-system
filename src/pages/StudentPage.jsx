@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -19,6 +19,13 @@ import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
 // 背包行囊
 import BackpackModal from "../components/BackpackModal";
 
+// ✅ 靈獸蛋（背包 item 定義）
+const EGG_REWARD = {
+  id: "pet_egg_001",
+  name: "靈獸蛋",
+  category: "pet",                 // 會進到背包「靈寵」分類
+  icon: "/merchandise/egg_001.png" // ✅ 你放 public/merchandise/ 底下的圖片
+};
 
 function HPBar({ now, max }) {
   const safeMax = Math.max(1, Number(max ?? 100));
@@ -114,6 +121,10 @@ const [bagItems, setBagItems] = useState([]);
 const [openPetModal, setOpenPetModal] = useState(false);
 const [openWeaponModal, setOpenWeaponModal] = useState(false);
 const [openFashionModal, setOpenFashionModal] = useState(false);
+
+// ✅ Lv5 獎勵彈窗（只給學生）
+const [openEggModal, setOpenEggModal] = useState(false);
+const eggRewardRunningRef = useRef(false);
 
   const navigate = useNavigate();
 
@@ -244,6 +255,57 @@ useEffect(() => {
 
   return () => unsub();
 }, [studentPath?.classId, studentPath?.studentId]);
+
+// ✅ Lv5（含以上）第一次登入/升級時：送靈獸蛋（只送一次）
+// 規則：用 inventory/egg_001 是否存在判斷已領過
+useEffect(() => {
+  if (!studentPath?.classId || !studentPath?.studentId) return;
+  if (!student) return;
+
+  // 只要達到 Lv5
+  const lv = Number(student.level || 0);
+  if (lv < 5) return;
+
+  // 避免 onSnapshot 連續觸發造成重複跑
+  if (eggRewardRunningRef.current) return;
+  eggRewardRunningRef.current = true;
+
+  const classId = studentPath.classId;
+  const studentId = studentPath.studentId;
+
+  // 你要把蛋圖放在 public/merchandise/egg_001.png
+  const eggRef = doc(db, "classes", classId, "students", studentId, "inventory", "egg_001");
+
+  (async () => {
+    try {
+      await runTransaction(db, async (tx) => {
+        // ✅ 先讀（所有讀取都要在寫入之前）
+        const eggSnap = await tx.get(eggRef);
+
+        // 已領過：直接結束（不寫入）
+        if (eggSnap.exists()) return;
+
+        // ✅ 再寫（這裡才開始 set）
+        tx.set(eggRef, {
+          itemId: "egg_001",
+          name: "靈獸蛋",
+          category: "pet",                 // 你背包 Tabs 有 pet/weapon/card/equip/fashion
+          icon: "/merchandise/egg_001.png", // ✅ public 路徑
+          qty: 1,
+          acquiredAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      // ✅ 發送成功才跳視窗
+      setOpenEggModal(true);
+    } catch (e) {
+      console.error("Lv5 egg reward error:", e);
+      // 如果失敗，允許下次再嘗試
+      eggRewardRunningRef.current = false;
+    }
+  })();
+}, [student?.level, studentPath?.classId, studentPath?.studentId]);
 
   // ✅ 配戴稱號：只更新 activeTitle + updatedAt（符合 rules）
   async function equipTitle(title) {
@@ -469,6 +531,60 @@ tx.set(invRef, {
           </tbody>
         </table>
       </Modal>
+
+      {/* ===================== Lv5 靈獸蛋獎勵彈窗（學生頁）===================== */}
+<Modal
+  open={openEggModal}
+  onClose={() => setOpenEggModal(false)}
+  title="🎉 恭喜獲得獎勵！"
+  width={560}
+>
+  <div style={{ display: "grid", gridTemplateColumns: "84px 1fr", gap: 14, alignItems: "center" }}>
+    <div
+      style={{
+        width: 84,
+        height: 84,
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.14)",
+        background: "rgba(255,255,255,0.06)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      {/* ✅ 用 public/ 路徑 */}
+      <img
+        src="/merchandise/egg_001.png"
+        alt="靈獸蛋"
+        style={{ width: "86%", height: "86%", objectFit: "contain" }}
+      />
+    </div>
+
+    <div>
+      <div style={{ fontSize: 18, fontWeight: 900, color: "#ffcc66" }}>
+        恭喜獲得：靈獸蛋
+      </div>
+
+      <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.6 }}>
+        你已達到 <b>Lv 5</b>，宗門特別贈送靈獸蛋一顆！<br />
+        已自動放入你的 <b>行囊</b> 中。
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+        （每個帳號限領一次）
+      </div>
+    </div>
+  </div>
+
+  <div style={{ height: 14 }} />
+
+  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+    <button className="rpg-btn" onClick={() => setOpenEggModal(false)}>
+      ✅ 收下 !
+    </button>
+  </div>
+</Modal>
 
       {/* ✅ 靈寵彈窗 */}
       <Modal open={openPetModal} title="🐾 靈寵" onClose={() => setOpenPetModal(false)} width={820}>

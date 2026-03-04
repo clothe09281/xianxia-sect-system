@@ -19,9 +19,6 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
-// 👇👇👇 MONSTERS 放在這裡 👇👇👇
-
-
 // 🏮 藏寶閣商品
 import TreasureShop from "../components/TreasureShop";
 import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
@@ -529,30 +526,22 @@ async function grantAchievementToTarget(a) {
   );
 }
 
-//數字排序
-const sortedStudents = [...students].sort((a, b) => {
-  const getLeadingNumber = (name) => {
-    const match = String(name || "").match(/^(\d+)/);
-    return match ? Number(match[1]) : null;
+// ✅ 數字優先排序（0,01,02...10...；沒有數字的放後面）
+const sortedStudents = useMemo(() => {
+  const getNum = (name) => {
+    const m = String(name || "").trim().match(/^(\d+)/);
+    return m ? parseInt(m[1], 10) : 9999;
   };
 
-  const aNum = getLeadingNumber(a.name);
-  const bNum = getLeadingNumber(b.name);
+  return [...students].sort((a, b) => {
+    const an = getNum(a.name);
+    const bn = getNum(b.name);
+    if (an !== bn) return an - bn;
 
-  // 兩個都有數字 → 比數字
-  if (aNum !== null && bNum !== null) {
-    return aNum - bNum;
-  }
-
-  // 只有 a 有數字 → a 在前
-  if (aNum !== null) return -1;
-
-  // 只有 b 有數字 → b 在前
-  if (bNum !== null) return 1;
-
-  // 都沒有數字 → 用中文排序
-  return String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant");
-});
+    // 數字相同或都沒數字：再用名字排序（穩定）
+    return String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant");
+  });
+}, [students]);
 
   // achievements 排序：優先用 threshold（若有），沒有就不排序
   const achievementsSorted = useMemo(() => {
@@ -574,7 +563,7 @@ const sortedStudents = [...students].sort((a, b) => {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="rpg-btn" onClick={openRaidModal}>歷練</button>
+          <button className="rpg-btn" onClick={openRaidModal}>修仙歷練</button>
           <button className="rpg-btn" onClick={() => setOpenRank(true)}>戰力榜</button>
           <button className="rpg-btn" onClick={() => setOpenTreasure(true)}>藏寶閣</button>
           <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
@@ -640,8 +629,8 @@ const sortedStudents = [...students].sort((a, b) => {
               </td>
               <td align="center"><div style={{ fontSize: 18, fontWeight: 700, color: "#ffcc66" }}>{s.level ?? 1}</div></td>
               <td align="center"><HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} /></td>
-              <td align="center"><div style={{ fontSize: 18, fontWeight: 600 }}>{s.xp ?? 0}</div></td>
-              <td align="center"><div style={{ fontSize: 18, fontWeight: 600 }}>{s.coin ?? 0}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.xp ?? 0}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.coin ?? 0}</div></td>
               <td align="center"><div style={{ fontSize: 20, fontWeight: 800, color: "#ff884d" }}>{s.cp ?? 0}</div></td>
               <td align="center">
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, 10)}>✅ 答對</button>{" "}
@@ -666,15 +655,24 @@ const sortedStudents = [...students].sort((a, b) => {
       </table>
 
 {/* ===================== 歷練彈窗 ===================== */}
-<Modal open={openRaid} title="⚔️ 歷練視窗" onClose={closeRaidModal} width={980}>
-  {/* 上方工具列 */}
-  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+<Modal open={openRaid} title="⚔️ 歷練視窗" onClose={closeRaidModal} width={1564}>
+  {/* 上方工具列（只放：選怪物/開始/重新選） */}
+  <div
+    style={{
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      flexWrap: "wrap",
+      paddingBottom: 30,
+      borderBottom: "1px solid rgba(255,255,255,0.12)",
+    }}
+  >
     <div style={{ opacity: 0.9 }}>👹 選擇怪物：</div>
 
     <select
       value={selectedMonsterId}
       onChange={(e) => setSelectedMonsterId(e.target.value)}
-      style={{ padding: 8 }}
+      style={{ padding: 8, minWidth: 220 }}
     >
       {MONSTERS.map((m) => (
         <option key={m.id} value={m.id}>
@@ -698,135 +696,209 @@ const sortedStudents = [...students].sort((a, b) => {
         重新選怪物
       </button>
     )}
+
+    <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>
+      {answererId
+        ? `答題者：${sortedStudents.find((s) => s.id === answererId)?.name || ""}`
+        : "尚未指定答題者"}
+    </div>
   </div>
 
-  <div style={{ height: 14 }} />
+  <div style={{ height: 30 }} />
 
   {/* 作戰畫面 */}
   {showBattle && battle?.monster ? (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-      {/* 左側：怪物資訊 + 圖片 */}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1.25fr 0.9fr 0.85fr",
+        gap: 16,
+        alignItems: "start",
+      }}
+    >
+      {/* ================= 左：怪物區 ================= */}
       <div
         style={{
           padding: 14,
           border: "1px solid rgba(218,185,120,0.25)",
           borderRadius: 10,
           display: "grid",
-          gridTemplateColumns: "1fr 260px", // ✅ 右側留給圖片（你紅框的區域）
+          gridTemplateColumns: "1fr 250px",
           gap: 14,
           alignItems: "center",
+          minHeight: 350,
         }}
       >
-        {/* 左：怪物資訊 */}
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>👹 {battle.monster.name}</div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>👹 {battle.monster.name}</div>
+
           <div style={{ marginTop: 10 }}>
             <HPBar now={battle.hp ?? 0} max={battle.monster.hp ?? 100} />
           </div>
 
           {!answererId && (
-            <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>請先指定答題者</div>
+            <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+              請先到右側「參戰列表」指定答題者
+            </div>
           )}
 
-          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {/* ✅ 答對/答錯移回原位（左側） */}
+          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
             {(battle.hp ?? 0) > 0 ? (
               <>
-                <button className="rpg-btn" onClick={answerCorrect} disabled={!answererId}>✅ 答對</button>
-                <button className="rpg-btn danger" onClick={answerWrong} disabled={!answererId}>❌ 答錯</button>
+                <button className="rpg-btn" onClick={answerCorrect} disabled={!answererId}>
+                  ✅ 答對
+                </button>
+                <button className="rpg-btn danger" onClick={answerWrong} disabled={!answererId}>
+                  ❌ 答錯
+                </button>
               </>
             ) : (
               <button className="rpg-btn" onClick={finishWin}>🎉 勝利！領取獎勵</button>
             )}
           </div>
-        </div>
 
-        {/* 右：怪物圖片（紅框位置） */}
-        <div
-          style={{
-            width: 260,
-            height: 220,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 10,
-          }}
-        >
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
+            參戰人數：{raidParticipants.length}
+          </div>
+        </div>        
           <img
             src={battle.monster.img}
             alt={battle.monster.name}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-            }}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
+      </div>
+
+      {/* ================= 中：勾選名單（縮小字+框） ================= */}
+      <div
+        style={{
+          padding: 14,
+          border: "1px solid rgba(218,185,120,0.25)",
+          borderRadius: 10,
+          minHeight: 360,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800 }}>🧑‍🎓 參戰名單（勾選）</div>
+        <div style={{ marginTop: 6, fontSize: 11, opacity: 0.75 }}>
+          依「數字優先」排序；可捲動
+        </div>
+
+        <div
+          style={{
+            marginTop: 10,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "6px 10px",          // ✅ 間距縮小
+            maxHeight: 420,
+            overflow: "auto",
+            paddingRight: 6,
+          }}
+        >
+          {sortedStudents.map((s) => {
+            const checked = raidParticipants.includes(s.id);
+            return (
+              <label
+                key={s.id}
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  padding: "7px 7px",   // ✅ 卡片縮小
+                  borderRadius: 8,
+                  background: checked ? "rgba(255,215,0,0.06)" : "transparent",
+                  border: checked ? "1px solid rgba(218,185,120,0.30)" : "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleRaidParticipant(s.id)}
+                  style={{ transform: "scale(0.95)" }} // ✅ 勾勾略小
+                />
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 16,        // ✅ 名字縮小
+                    lineHeight: 1.1,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: 140,
+                  }}
+                  title={s.name}
+                >
+                  {s.name}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </div>
 
-      {/* 右側：選參戰弟子 */}
-      <div style={{ padding: 14, border: "1px solid rgba(218,185,120,0.25)", borderRadius: 10 }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>🧑‍🎓 選參戰弟子</div>
+      {/* ================= 右：指定答題者 ================= */}
+      <div
+        style={{
+          padding: 60,
+          border: "1px solid rgba(218,185,120,0.25)",
+          borderRadius: 10,
+          justifySelf: "end",
+          minHeight: 360,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800 }}>🎯 參戰列表（指定答題者）</div>
 
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰名單（勾選）</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {students.map((s) => {
-              const checked = raidParticipants.includes(s.id);
-              return (
-                <label key={s.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleRaidParticipant(s.id)} />
-                  {s.name}
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        {raidParticipants.length === 0 ? (
+          <div style={{ marginTop: 12, opacity: 0.8, fontSize: 13 }}>尚未選擇參戰弟子</div>
+        ) : (
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              maxHeight: 420,
+              overflow: "auto",
+              paddingRight: 6,
+            }}
+          >
+            {sortedStudents
+              .filter((s) => raidParticipants.includes(s.id))
+              .map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    padding: 10,
+                    borderRadius: 10,
+                    border:
+                      answererId === s.id
+                        ? "1px solid rgba(218,185,120,0.90)"
+                        : "1px solid rgba(255,255,255,0.12)",
+                    background: answererId === s.id ? "rgba(255,215,0,0.06)" : "rgba(255,255,255,0.03)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="radio"
+                        name="answerer"
+                        checked={answererId === s.id}
+                        onChange={() => setAnswererId(s.id)}
+                      />
+                      <strong>{s.name}</strong>
+                    </label>
 
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>參戰列表（指定答題者）</div>
-
-          {raidParticipants.length === 0 ? (
-            <div style={{ opacity: 0.8, fontSize: 13 }}>尚未選擇參戰弟子</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {raidParticipants.map((sid) => {
-                const s = students.find((x) => x.id === sid);
-                if (!s) return null;
-
-                return (
-                  <div
-                    key={sid}
-                    style={{
-                      padding: 10,
-                      border: answererId === sid
-                        ? "1px solid rgba(218,185,120,0.85)"
-                        : "1px solid rgba(255,255,255,0.15)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input
-                          type="radio"
-                          name="answerer"
-                          checked={answererId === sid}
-                          onChange={() => setAnswererId(sid)}
-                        />
-                        <strong>{s.name}</strong>
-                      </label>
-                      <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.85 }}>
-                        Lv {s.level ?? 1}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} />
-                    </div>
+                    <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.85 }}>
+                      Lv {s.level ?? 1}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                  <div style={{ marginTop: 8 }}>
+                    <HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} />
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   ) : (
@@ -835,7 +907,6 @@ const sortedStudents = [...students].sort((a, b) => {
     </div>
   )}
 </Modal>
-
       {/* ===================== 戰力榜彈窗 ===================== */}
       <Modal open={openRank} title="🏆 戰力榜" onClose={() => setOpenRank(false)} width={820}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -11,21 +11,14 @@ import {
   query,
   orderBy,
   serverTimestamp,
-  runTransaction
+  runTransaction,
 } from "firebase/firestore";
-//藏寶閣
-import TreasureShop from "../components/TreasureShop";
-import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
-// 背包行囊
-import BackpackModal from "../components/BackpackModal";
 
-// ✅ 靈獸蛋（背包 item 定義）
-const EGG_REWARD = {
-  id: "pet_egg_001",
-  name: "靈獸蛋",
-  category: "pet",                 // 會進到背包「靈寵」分類
-  icon: "/merchandise/egg_001.png" // ✅ 你放 public/merchandise/ 底下的圖片
-};
+import TreasureShop from "../components/TreasureShop";
+import { SHOP_ITEMS } from "../data/shopItems";
+import { PETS_MASTER, createPetDoc } from "../data/pets";
+import BackpackModal from "../components/BackpackModal";
+import PetHatchModal from "../components/PetHatchModal";
 
 function HPBar({ now, max }) {
   const safeMax = Math.max(1, Number(max ?? 100));
@@ -58,7 +51,6 @@ function HPBar({ now, max }) {
   );
 }
 
-/** ✅ 通用 Modal：置中 + 背景變暗 + 點背景關閉（跟老師頁同款） */
 function Modal({ open, title, onClose, children, width = 860 }) {
   if (!open) return null;
   return (
@@ -102,37 +94,35 @@ function Modal({ open, title, onClose, children, width = 860 }) {
 
 export default function StudentPage() {
   const [msg, setMsg] = useState("");
-  const [meIndex, setMeIndex] = useState(null); // users/{uid}
-  const [student, setStudent] = useState(null); // classes/{classId}/students/{studentId}
-  const [studentPath, setStudentPath] = useState(null); // { classId, studentId }
+  const [meIndex, setMeIndex] = useState(null);
+  const [student, setStudent] = useState(null);
+  const [studentPath, setStudentPath] = useState(null);
 
-  // ===== 學生成就/稱號彈窗 =====
   const [openAchModal, setOpenAchModal] = useState(false);
   const [achievements, setAchievements] = useState([]);
 
-  // ===== 藏寶閣彈窗（學生頁）=====
-const [openTreasure, setOpenTreasure] = useState(false);
+  const [openTreasure, setOpenTreasure] = useState(false);
 
-  // ===== 背包彈窗 + 背包資料 =====
-const [openBag, setOpenBag] = useState(false);
-const [bagItems, setBagItems] = useState([]);
+  const [openBag, setOpenBag] = useState(false);
+  const [bagItems, setBagItems] = useState([]);
 
-  // ✅ 新增：靈寵 / 神兵 / 行囊 / 藏寶閣 / 時裝 彈窗
-const [openPetModal, setOpenPetModal] = useState(false);
-const [openWeaponModal, setOpenWeaponModal] = useState(false);
-const [openFashionModal, setOpenFashionModal] = useState(false);
+  const [openPetModal, setOpenPetModal] = useState(false);
+  const [openWeaponModal, setOpenWeaponModal] = useState(false);
+  const [openFashionModal, setOpenFashionModal] = useState(false);
 
-// ✅ Lv5 獎勵彈窗（只給學生）
-const [openEggModal, setOpenEggModal] = useState(false);
-const eggRewardRunningRef = useRef(false);
+  const [openEggModal, setOpenEggModal] = useState(false);
+  const eggRewardRunningRef = useRef(false);
+  const eggModalShownRef = useRef(false);
+
+  const [petList, setPetList] = useState([]);
+  const [selectedPetId, setSelectedPetId] = useState("");
+  const [petTab, setPetTab] = useState("detail");
 
   const navigate = useNavigate();
 
-  // 方便用
   const classId = studentPath?.classId || null;
   const studentId = studentPath?.studentId || null;
 
-  // ✅ 登入 + 監聽自己的 student doc
   useEffect(() => {
     let unsubStudent = null;
 
@@ -147,10 +137,9 @@ const eggRewardRunningRef = useRef(false);
         return;
       }
 
-      // 讀 users/{uid}
       const usnap = await getDoc(doc(db, "users", u.uid));
       if (!usnap.exists()) {
-        setMsg("尚未建立學生索引（users/{uid}）。請回學生登入頁完成「註冊/認領」。");
+        setMsg("尚未建立學生索引（users/{uid}）。請回學生登入頁完成註冊/認領。");
         return;
       }
 
@@ -163,7 +152,7 @@ const eggRewardRunningRef = useRef(false);
       }
 
       if (!ud.classId || !ud.studentId) {
-        setMsg("尚未加入班級（缺 classId / studentId）。請回學生登入頁完成「註冊/認領」。");
+        setMsg("尚未加入班級（缺 classId / studentId）。請回學生登入頁完成註冊/認領。");
         return;
       }
 
@@ -182,9 +171,9 @@ const eggRewardRunningRef = useRef(false);
             setStudent(null);
             return;
           }
+
           const sd = s.data();
 
-          // 額外保護：確認這筆真的是你認領的
           if (sd.authUid && sd.authUid !== u.uid) {
             setMsg("此弟子已被其他帳號認領（authUid 不符）。請回去重新認領。");
             setStudent(null);
@@ -203,7 +192,6 @@ const eggRewardRunningRef = useRef(false);
     };
   }, [navigate]);
 
-  // ✅ 讀取本班 achievements：classes/{classId}/achievements
   useEffect(() => {
     if (!classId) return;
 
@@ -221,93 +209,203 @@ const eggRewardRunningRef = useRef(false);
     return () => unsub();
   }, [classId]);
 
- // ✅ 監聽背包：classes/{classId}/students/{studentId}/inventory
-useEffect(() => {
-  if (!studentPath?.classId || !studentPath?.studentId) return;
+  useEffect(() => {
+    if (!studentPath?.classId || !studentPath?.studentId) return;
 
-  const invCol = collection(
-    db,
-    "classes",
-    studentPath.classId,
-    "students",
-    studentPath.studentId,
-    "inventory"
-  );
+    const invCol = collection(
+      db,
+      "classes",
+      studentPath.classId,
+      "students",
+      studentPath.studentId,
+      "inventory"
+    );
 
-  const unsub = onSnapshot(
-    invCol,
-    (snap) => {
-      const arr = snap.docs.map((d) => {
-        const data = d.data() || {};
-        return {
-          id: d.id,                         // itemId（docId）
-          name: data.name || "",
-          category: data.category || "card", // pet/weapon/card/equip/fashion
-          icon: data.icon || "",
-          qty: Number(data.qty || 0),
-        };
-      });
+    const unsub = onSnapshot(
+      invCol,
+      (snap) => {
+        const arr = snap.docs.map((d) => {
+          const data = d.data() || {};
+          return {
+            id: d.id,
+            name: data.name || "",
+            category: data.category || "card",
+            icon: data.icon || "",
+            qty: Number(data.qty || 0),
+            feedCount: Number(data.feedCount || 0),
+            hatched: Boolean(data.hatched || false),
+            hatchedTo: data.hatchedTo || "",
+            activated: Boolean(data.activated || false),
+          };
+        });
 
-      setBagItems(arr.filter((x) => x.qty > 0));
-    },
-    (err) => console.error("inventory listen error:", err)
-  );
+        setBagItems(arr.filter((x) => x.qty > 0));
+      },
+      (err) => console.error("inventory listen error:", err)
+    );
 
-  return () => unsub();
-}, [studentPath?.classId, studentPath?.studentId]);
+    return () => unsub();
+  }, [studentPath?.classId, studentPath?.studentId]);
 
-// ✅ Lv5（含以上）第一次登入/升級時：送靈獸蛋（只送一次）
-// 規則：用 inventory/egg_001 是否存在判斷已領過
-useEffect(() => {
-  if (!studentPath?.classId || !studentPath?.studentId) return;
-  if (!student) return;
+  useEffect(() => {
+    if (!studentPath?.classId || !studentPath?.studentId) return;
 
-  // 只要達到 Lv5
-  const lv = Number(student.level || 0);
-  if (lv < 5) return;
+    const petCol = collection(
+      db,
+      "classes",
+      studentPath.classId,
+      "students",
+      studentPath.studentId,
+      "pets"
+    );
 
-  // 避免 onSnapshot 連續觸發造成重複跑
-  if (eggRewardRunningRef.current) return;
-  eggRewardRunningRef.current = true;
+    const unsub = onSnapshot(
+      petCol,
+      (snap) => {
+        const arr = snap.docs.map((d) => {
+          const data = d.data() || {};
+          return {
+            id: d.id,
+            petId: data.petId || d.id,
+            name: data.name || "",
+            icon: data.icon || "",
+            level: Number(data.level || 1),
+            exp: Number(data.exp || 0),
+            star: Number(data.star || 1),
+            hp: Number(data.hp || 0),
+            atk: Number(data.atk || 0),
+            spd: Number(data.spd || 0),
+            passive: data.passive || "",
+            skillName: data.skillName || "",
+            skillDesc: data.skillDesc || "",
+            owned: Boolean(data.owned || false),
+            equipped: Boolean(data.equipped || false),
+          };
+        });
 
-  const classId = studentPath.classId;
-  const studentId = studentPath.studentId;
+        setPetList(arr);
 
-  // 你要把蛋圖放在 public/merchandise/egg_001.png
-  const eggRef = doc(db, "classes", classId, "students", studentId, "inventory", "egg_001");
+        if (arr.length > 0) {
+          setSelectedPetId((prev) => prev || arr[0].petId);
+        } else {
+          setSelectedPetId("");
+        }
+      },
+      (err) => console.error("pets listen error:", err)
+    );
 
-  (async () => {
+    return () => unsub();
+  }, [studentPath?.classId, studentPath?.studentId]);
+
+  useEffect(() => {
+    if (!studentPath?.classId || !studentPath?.studentId) return;
+    if (!student) return;
+
+    const lv = Number(student.level || 0);
+    if (lv < 5) return;
+    if (student.eggRewardClaimed) return;
+    if (eggModalShownRef.current) return;
+    if (eggRewardRunningRef.current) return;
+
+    eggRewardRunningRef.current = true;
+    eggModalShownRef.current = true;
+    setOpenEggModal(true);
+    eggRewardRunningRef.current = false;
+  }, [student?.level, student?.eggRewardClaimed, studentPath?.classId, studentPath?.studentId]);
+
+  async function acceptEggReward() {
+    if (!studentPath?.classId || !studentPath?.studentId) return;
+
+    const sRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId);
+    const eggRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId, "inventory", "egg_001");
+
     try {
       await runTransaction(db, async (tx) => {
-        // ✅ 先讀（所有讀取都要在寫入之前）
+        const sSnap = await tx.get(sRef);
         const eggSnap = await tx.get(eggRef);
 
-        // 已領過：直接結束（不寫入）
-        if (eggSnap.exists()) return;
+        if (!sSnap.exists()) throw new Error("找不到學生資料");
 
-        // ✅ 再寫（這裡才開始 set）
-        tx.set(eggRef, {
-          itemId: "egg_001",
-          name: "靈獸蛋",
-          category: "pet",                 // 你背包 Tabs 有 pet/weapon/card/equip/fashion
-          icon: "/merchandise/egg_001.png", // ✅ public 路徑
-          qty: 1,
-          acquiredAt: serverTimestamp(),
+        const sData = sSnap.data() || {};
+        if (sData.eggRewardClaimed) return;
+
+        if (!eggSnap.exists()) {
+          tx.set(eggRef, {
+            itemId: "egg_001",
+            name: "靈獸蛋",
+            category: "pet",
+            icon: "/merchandise/egg_001.png",
+            qty: 1,
+            feedCount: 0,
+            hatched: false,
+            acquiredAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          const oldQty = Number(eggSnap.data()?.qty || 0);
+          tx.update(eggRef, {
+            qty: oldQty + 1,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        tx.update(sRef, {
+          eggRewardClaimed: true,
+          eggRewardClaimedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       });
 
-      // ✅ 發送成功才跳視窗
-      setOpenEggModal(true);
+      setOpenEggModal(false);
     } catch (e) {
-      console.error("Lv5 egg reward error:", e);
-      // 如果失敗，允許下次再嘗試
-      eggRewardRunningRef.current = false;
+      console.error("acceptEggReward error:", e);
+      alert(e?.message || "收下失敗");
     }
-  })();
-}, [student?.level, studentPath?.classId, studentPath?.studentId]);
+  }
 
-  // ✅ 配戴稱號：只更新 activeTitle + updatedAt（符合 rules）
+  async function handleUseItem(item) {
+    if (!studentPath?.classId || !studentPath?.studentId) return;
+    if (item.id !== "egg_001") return;
+
+    const studentRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId);
+    const eggRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId, "inventory", "egg_001");
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const sSnap = await tx.get(studentRef);
+        const eggSnap = await tx.get(eggRef);
+
+        if (!sSnap.exists()) throw new Error("找不到學生資料");
+        if (!eggSnap.exists()) throw new Error("找不到靈獸蛋");
+
+        const sData = sSnap.data() || {};
+        const eggData = eggSnap.data() || {};
+        const eggQty = Number(eggData.qty || 0);
+
+        if (sData.petSystemUnlocked) throw new Error("靈獸系統已開啟");
+        if (eggQty <= 0) throw new Error("靈獸蛋數量不足");
+
+        tx.update(eggRef, {
+          activated: true,
+          updatedAt: serverTimestamp(),
+        });
+
+        tx.update(studentRef, {
+          petSystemUnlocked: true,
+          petSystemUnlockedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      alert("🎉 已使用靈獸蛋，靈獸系統正式開啟！");
+      setOpenBag(false);
+      setOpenPetModal(true);
+    } catch (e) {
+      console.error("handleUseItem error:", e);
+      alert(e?.message || "使用失敗");
+    }
+  }
+
   async function equipTitle(title) {
     if (!classId || !studentId) return;
 
@@ -325,89 +423,142 @@ useEffect(() => {
     });
   }
 
- // ✅ 藏寶閣：學生購買（扣妖丹 + 寫入 students/{id}/inventory/{itemId}）
-async function handleStudentBuy({ tabKey, item, price }) {
-  if (!studentPath?.classId || !studentPath?.studentId) {
-    alert("尚未取得 studentPath");
-    return;
-  }
+  async function handleStudentBuy({ tabKey, item, price }) {
+    if (!studentPath?.classId || !studentPath?.studentId) {
+      alert("尚未取得 studentPath");
+      return;
+    }
 
-  const classId = studentPath.classId;
-  const studentId = studentPath.studentId;
+    const sRef = doc(db, "classes", studentPath.classId, "students", studentPath.studentId);
+    const inventoryRef = doc(
+      db,
+      "classes",
+      studentPath.classId,
+      "students",
+      studentPath.studentId,
+      "inventory",
+      item.id
+    );
 
-  // 1) 學生主檔
-  const sRef = doc(db, "classes", classId, "students", studentId);
+    const isPetItem = item.itemType === "pet";
+    const isPetShardItem = item.itemType === "pet_shard";
 
-  // 2) 背包子集合：用 item.id 當 docId（重複購買就累加 qty）
-  const invRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
+    const category =
+      item.id === "mat_lingbao_001" ||
+      item.id === "mat_lingbao_002" ||
+      item.id === "mat_lingbao_003"
+        ? "pet"
+        : tabKey === "pet"
+        ? "pet"
+        : tabKey === "weapon"
+        ? "weapon"
+        : tabKey === "privilege"
+        ? "card"
+        : "card";
 
-  // 3) 分類 mapping：你的商店 privilege → 背包 card
-  const category =
-    tabKey === "pet"
-      ? "pet"
-      : tabKey === "weapon"
-      ? "weapon"
-      : tabKey === "privilege"
-      ? "card"
-      : tabKey === "card"
-      ? "card"
-      : tabKey === "equip"
-      ? "equip"
-      : tabKey === "fashion"
-      ? "fashion"
-      : "card";
+    try {
+      await runTransaction(db, async (tx) => {
+        const sSnap = await tx.get(sRef);
+        if (!sSnap.exists()) throw new Error("找不到學生資料");
 
-  try {
-    await runTransaction(db, async (tx) => {
-      // 先讀學生 coin
-      const sSnap = await tx.get(sRef);
-      if (!sSnap.exists()) throw new Error("找不到學生資料");
+        const sData = sSnap.data() || {};
+        const coinNow = Number(sData.coin || 0);
+        const cost = Number(price || 0);
 
-      const sData = sSnap.data() || {};
-      const coinNow = Number(sData.coin || 0);
-      const cost = Number(price || 0);
+        if (cost <= 0) throw new Error("商品金額異常");
+        if (coinNow < cost) throw new Error("妖丹不足，無法購買");
 
-      if (cost <= 0) throw new Error("商品金額異常");
-      if (coinNow < cost) throw new Error("妖丹不足，無法購買");
+        // 1) 靈寵本體：直接進 pets
+        if (isPetItem) {
+          const petRef = doc(
+            db,
+            "classes",
+            studentPath.classId,
+            "students",
+            studentPath.studentId,
+            "pets",
+            item.id
+          );
+          const petSnap = await tx.get(petRef);
 
-      // 再讀背包該 item（看看有沒有買過）
-      const invSnap = await tx.get(invRef);
+          const master = PETS_MASTER[item.id];
+          if (!master) throw new Error("找不到靈寵主資料");
 
-      // 扣妖丹
-      tx.update(sRef, {
-        coin: coinNow - cost,
-        updatedAt: serverTimestamp(),
-      });
+          tx.update(sRef, {
+            coin: coinNow - cost,
+            updatedAt: serverTimestamp(),
+          });
 
-      // 寫入/累加背包
-      if (!invSnap.exists()) {
-        const safeIcon = String(item.icon || "");
-const iconToStore = safeIcon.startsWith("/") ? safeIcon : ""; // 只存 /merchandise/xxx.png 這種
+          if (!petSnap.exists()) {
+            tx.set(petRef, {
+              ...createPetDoc(master),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            // 已有同隻 → 改給通用靈寵碎片
+            const oldPetShard = Number(sData.petShard || 0);
+            tx.update(sRef, {
+              petShard: oldPetShard + 1,
+              updatedAt: serverTimestamp(),
+            });
+          }
 
-tx.set(invRef, {
-  itemId: item.id,
-  name: item.name || "",
-  category,
-  icon: iconToStore,
-  qty: 1,
-  acquiredAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-      } else {
-        const oldQty = Number(invSnap.data()?.qty || 0);
-        tx.update(invRef, {
-          qty: oldQty + 1,
+          return;
+        }
+
+        // 2) 通用靈寵碎片：直接加到 student.petShard
+        if (isPetShardItem) {
+          const oldPetShard = Number(sData.petShard || 0);
+
+          tx.update(sRef, {
+            coin: coinNow - cost,
+            petShard: oldPetShard + 1,
+            updatedAt: serverTimestamp(),
+          });
+
+          return;
+        }
+
+        // 3) 其他商品：進 inventory
+        const invSnap = await tx.get(inventoryRef);
+
+        tx.update(sRef, {
+          coin: coinNow - cost,
           updatedAt: serverTimestamp(),
         });
-      }
-    });
 
-    alert(`✅ 購買成功：${item.name}（-${price} 妖丹）`);
-  } catch (e) {
-    alert(e?.message || "購買失敗");
+        if (!invSnap.exists()) {
+          const safeIcon = String(item.icon || "");
+          const iconToStore = safeIcon.startsWith("/") ? safeIcon : "";
+
+          tx.set(inventoryRef, {
+            itemId: item.id,
+            name: item.name || "",
+            category,
+            icon: iconToStore,
+            qty: 1,
+            acquiredAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          const oldQty = Number(invSnap.data()?.qty || 0);
+          tx.update(inventoryRef, {
+            qty: oldQty + 1,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+
+      alert(`✅ 購買成功：${item.name}（-${price} 妖丹）`);
+    } catch (e) {
+      alert(e?.message || "購買失敗");
+    }
   }
-}
 
+  const selectedPet = useMemo(() => {
+    return petList.find((p) => p.petId === selectedPetId) || petList[0] || null;
+  }, [petList, selectedPetId]);
 
   if (msg) {
     return (
@@ -442,7 +593,6 @@ tx.set(invRef, {
         </div>
       </div>
 
-      {/* ✅ 成就稱號彈窗 */}
       <Modal
         open={openAchModal}
         title={`🎖️ 成就稱號（目前：${student?.activeTitle || "未配戴"}）`}
@@ -450,7 +600,7 @@ tx.set(invRef, {
         width={980}
       >
         <div style={{ opacity: 0.9, marginBottom: 10 }}>
-          ✅ 只有「已解鎖」的稱號才可配戴；配戴只會更新 <b>activeTitle</b>（符合 rules）
+          ✅ 只有「已解鎖」的稱號才可配戴；配戴只會更新 <b>activeTitle</b>
         </div>
 
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -471,17 +621,11 @@ tx.set(invRef, {
                 ? student.unlockedAchievements
                 : [];
 
-              // ✅ 兼容兩種格式：
-              // 1) 只存 id： "o058_...."
-              // 2) 存完整 key： "classes/{classId}/achievements/o058_...."
               const key = `classes/${classId}/achievements/${a.id}`;
               const unlocked = unlockedAchievements.includes(a.id) || unlockedAchievements.includes(key);
 
               const unlockedTitles = Array.isArray(student?.unlockedTitles) ? student.unlockedTitles : [];
-
-              // ✅ 能配戴：成就已解鎖 + 有稱號 + 稱號已在 unlockedTitles
               const canEquip = unlocked && !!title && unlockedTitles.includes(title);
-
               const isEquipped = !!title && student?.activeTitle === title;
 
               return (
@@ -509,15 +653,6 @@ tx.set(invRef, {
                           cursor: canEquip ? "pointer" : "not-allowed",
                           filter: canEquip ? "none" : "grayscale(1)",
                         }}
-                        title={
-                          !unlocked
-                            ? "未解鎖此成就"
-                            : !unlockedTitles.includes(title)
-                            ? "尚未解鎖此稱號"
-                            : isEquipped
-                            ? "點一下取消配戴"
-                            : "配戴稱號"
-                        }
                       >
                         {isEquipped ? "取消配戴" : "配戴"}
                       </button>
@@ -532,100 +667,98 @@ tx.set(invRef, {
         </table>
       </Modal>
 
-      {/* ===================== Lv5 靈獸蛋獎勵彈窗（學生頁）===================== */}
-<Modal
-  open={openEggModal}
-  onClose={() => setOpenEggModal(false)}
-  title="🎉 恭喜獲得獎勵！"
-  width={560}
->
-  <div style={{ display: "grid", gridTemplateColumns: "84px 1fr", gap: 14, alignItems: "center" }}>
-    <div
-      style={{
-        width: 84,
-        height: 84,
-        borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.14)",
-        background: "rgba(255,255,255,0.06)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-      }}
-    >
-      {/* ✅ 用 public/ 路徑 */}
-      <img
-        src="/merchandise/egg_001.png"
-        alt="靈獸蛋"
-        style={{ width: "86%", height: "86%", objectFit: "contain" }}
-      />
-    </div>
+      <Modal
+        open={openEggModal}
+        onClose={() => setOpenEggModal(false)}
+        title="🎉 恭喜獲得獎勵！"
+        width={560}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "84px 1fr", gap: 14, alignItems: "center" }}>
+          <div
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(255,255,255,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            <img
+              src="/merchandise/egg_001.png"
+              alt="靈獸蛋"
+              style={{ width: "86%", height: "86%", objectFit: "contain" }}
+            />
+          </div>
 
-    <div>
-      <div style={{ fontSize: 18, fontWeight: 900, color: "#ffcc66" }}>
-        恭喜獲得：靈獸蛋
-      </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#ffcc66" }}>
+              恭喜獲得：靈獸蛋
+            </div>
 
-      <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.6 }}>
-        你已達到 <b>Lv 5</b>，宗門特別贈送靈獸蛋一顆！<br />
-        已自動放入你的 <b>行囊</b> 中。
-      </div>
+            <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.6 }}>
+              你已達到 <b>Lv 5</b>，宗門特別贈送靈獸蛋一顆！<br />
+              按下「收下」後，靈獸蛋將放入你的 <b>行囊</b> 中。
+            </div>
 
-      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-        （每個帳號限領一次）
-      </div>
-    </div>
-  </div>
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+              （每個帳號限領一次）
+            </div>
+          </div>
+        </div>
 
-  <div style={{ height: 14 }} />
+        <div style={{ height: 14 }} />
 
-  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-    <button className="rpg-btn" onClick={() => setOpenEggModal(false)}>
-      ✅ 收下 !
-    </button>
-  </div>
-</Modal>
-
-      {/* ✅ 靈寵彈窗 */}
-      <Modal open={openPetModal} title="🐾 靈寵" onClose={() => setOpenPetModal(false)} width={820}>
-        <div style={{ opacity: 0.9 }}>
-           這裡之後放「靈寵列表 / 裝備 / 升級」等內容（目前先占位）。
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="rpg-btn" onClick={acceptEggReward}>✅ 收下！</button>
         </div>
       </Modal>
 
-      {/* ✅ 神兵彈窗 */}
+      <PetHatchModal
+        open={openPetModal}
+        onClose={() => setOpenPetModal(false)}
+        student={student}
+        studentPath={studentPath}
+        bagItems={bagItems}
+        petList={petList}
+        selectedPetId={selectedPetId}
+        setSelectedPetId={setSelectedPetId}
+        petTab={petTab}
+        setPetTab={setPetTab}
+      />
+
       <Modal open={openWeaponModal} title="⚔️ 神兵" onClose={() => setOpenWeaponModal(false)} width={820}>
-         <div style={{ opacity: 0.9 }}>
-           這裡之後放「神兵列表 / 強化 / 佩戴」等內容（目前先占位）。
-         </div>
+        <div style={{ opacity: 0.9 }}>
+          這裡之後放「神兵列表 / 強化 / 佩戴」等內容（目前先占位）。
+        </div>
       </Modal>
 
-      {/* ✅ 背包彈窗 */}
       <BackpackModal
-  open={openBag}
-  onClose={() => setOpenBag(false)}
-  items={bagItems}
-  slotsPerTab={24}
-/>
+        open={openBag}
+        onClose={() => setOpenBag(false)}
+        items={bagItems}
+        slotsPerTab={24}
+        onUseItem={handleUseItem}
+      />
 
-      {/* ✅ 藏寶閣彈窗 */}
       <TreasureShop
-  open={openTreasure}
-  onClose={() => setOpenTreasure(false)}
-  mode="student"
-  items={SHOP_ITEMS}
-  coin={student?.coin ?? 0} // ✅ 建議保留，才能判斷買不買得起 & 顯示妖丹
-  onBuy={handleStudentBuy}
-/>
+        open={openTreasure}
+        onClose={() => setOpenTreasure(false)}
+        mode="student"
+        items={SHOP_ITEMS}
+        coin={student?.coin ?? 0}
+        onBuy={handleStudentBuy}
+      />
 
-      {/* ✅ 時裝彈窗 */}
       <Modal open={openFashionModal} title="👘 時裝" onClose={() => setOpenFashionModal(false)} width={820}>
         <div style={{ opacity: 0.9 }}>
-           這裡之後放「時裝清單 / 試穿 / 套用外觀」等內容（目前先占位）。
+          這裡之後放「時裝清單 / 試穿 / 套用外觀」等內容（目前先占位）。
         </div>
       </Modal>
 
-      {/* ✅ 弟子資訊卡 */}
       <div
         style={{
           marginTop: 14,
@@ -652,23 +785,70 @@ tx.set(invRef, {
 
         <div style={{ height: 12 }} />
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.9 }}>
-          <div  style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
-          <div  style={{ fontSize: 20, fontWeight: 800 }}>戰力：{student.cp ?? 0}</div>
-          <div  style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>戰力：{student.cp ?? 0}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>靈寵碎片：{Number(student.petShard || 0)}</div>
         </div>
 
         <div style={{ height: 10 }} />
         <div style={{ fontSize: 12, opacity: 0.7 }}>
           班級代碼：{meIndex?.classCode || "—"}　|　弟子ID：{meIndex?.studentId || "—"}
         </div>
+      </div>
+
+      <div style={{ height: 16 }} />
+
+      <div
+        style={{
+          padding: 16,
+          border: "1px solid rgba(218,185,120,0.35)",
+          borderRadius: 12,
+          background: "rgba(20,20,20,0.72)",
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>
+          🐾 目前靈寵
         </div>
 
-        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap"  }}>
-         <button className="rpg-btn" onClick={() => setOpenAchModal(true)}>🎖️ 成就稱號</button>
-         <button className="rpg-btn" onClick={() => setOpenPetModal(true)}>🐾 靈寵</button>
-         <button className="rpg-btn" onClick={() => setOpenWeaponModal(true)}>⚔️ 神兵</button>
-         <button className="rpg-btn" onClick={() => setOpenBag(true)}>🎒 行囊</button>
-        </div>
+        {student?.currentPetId ? (
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <div
+              style={{
+                width: 92,
+                height: 92,
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
+              <img
+                src={student.currentPetIcon}
+                alt={student.currentPetName}
+                style={{ width: "82%", height: "82%", objectFit: "contain" }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{student.currentPetName}</div>
+              <div style={{ marginTop: 6, opacity: 0.8 }}>已出戰中</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ opacity: 0.75 }}>尚未孵化靈寵</div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button className="rpg-btn" onClick={() => setOpenAchModal(true)}>🎖️ 成就稱號</button>
+        <button className="rpg-btn" onClick={() => setOpenPetModal(true)}>🐾 靈寵</button>
+        <button className="rpg-btn" onClick={() => setOpenWeaponModal(true)}>⚔️ 神兵</button>
+        <button className="rpg-btn" onClick={() => setOpenBag(true)}>🎒 行囊</button>
+      </div>
     </div>
   );
 }

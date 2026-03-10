@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 
-/** ✅ 通用 Modal（跟你老師頁同款） */
+/** ✅ 通用 Modal */
 function Modal({ open, title, onClose, children, width = 980 }) {
   if (!open) return null;
+
   return (
     <div
       onMouseDown={onClose}
@@ -31,10 +32,18 @@ function Modal({ open, title, onClose, children, width = 980 }) {
           padding: 16,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
           <div style={{ fontSize: 18, fontWeight: 800 }}>{title}</div>
           <button className="rpg-btn" onClick={onClose}>關閉</button>
         </div>
+
         <div style={{ height: 12 }} />
         {children}
       </div>
@@ -71,7 +80,8 @@ function TabBtn({ active, onClick, children }) {
  * Props:
  * - open / onClose
  * - items: Array<{ id,name,category,icon,qty }>
- * - slotsPerTab?: number (每個分類要顯示幾格，預設 24)
+ * - slotsPerTab?: number
+ * - onUseItem?: (item) => void
  */
 export default function BackpackModal({
   open,
@@ -79,6 +89,7 @@ export default function BackpackModal({
   items = [],
   slotsPerTab = 24,
   width = 980,
+  onUseItem,
 }) {
   const [tab, setTab] = useState("pet");
 
@@ -87,7 +98,6 @@ export default function BackpackModal({
     return arr.filter((x) => x?.category === tab);
   }, [items, tab]);
 
-  // ✅ 生成固定格數（空格補滿）
   const slots = useMemo(() => {
     const filled = tabItems.slice(0, slotsPerTab);
     const emptyCount = Math.max(0, slotsPerTab - filled.length);
@@ -96,7 +106,6 @@ export default function BackpackModal({
 
   return (
     <Modal open={open} onClose={onClose} title="🎒 行囊（背包）" width={width}>
-      {/* Tabs */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         {TABS.map((t) => (
           <TabBtn key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
@@ -111,81 +120,100 @@ export default function BackpackModal({
 
       <div style={{ height: 12 }} />
 
-      {/* Grid */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)", // 6格一排
+          gridTemplateColumns: "repeat(6, 1fr)",
           gap: 10,
         }}
       >
         {slots.map((it, idx) => {
-  const src =
-    it && typeof it.icon === "string" && it.icon.startsWith("/")
-      ? it.icon
-      : "";
+          const src =
+            it && typeof it.icon === "string" && it.icon.startsWith("/")
+              ? it.icon
+              : "";
 
-  return (
-    <div
-      key={it?.id ? it.id : `empty-${idx}`}
-      style={{
-        height: 86,
-        borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.14)",
-        background: "rgba(255,255,255,0.04)",
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-      }}
-      title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
-    >
-      {!it ? (
-        <div style={{ opacity: 0.25, fontSize: 12 }}></div>
-      ) : (
-        <>
-          {src ? (
-  <img
-    src={src}
-    alt={it.name}
-    style={{
-      width: "82%",
-      height: "82%",
-      objectFit: "contain",
-    }}
-    onError={(e) => {
-      console.log("❌ 背包圖片載入失敗：", src, it);
-      e.currentTarget.style.display = "none";
-    }}
-  />
-) : (
-  <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
-)}
+          return (
+            <div
+              key={it?.id ? it.id : `empty-${idx}`}
+              style={{
+                height: 86,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.04)",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+              title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
+            >
+              {!it ? (
+                <div style={{ opacity: 0.2, fontSize: 12 }}>空</div>
+              ) : (
+                <>
+                  {src ? (
+                    <img
+                      src={src}
+                      alt={it.name}
+                      style={{
+                        width: "82%",
+                        height: "82%",
+                        objectFit: "contain",
+                      }}
+                      onError={(e) => {
+                        console.log("❌ 背包圖片載入失敗：", src, it);
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 26, opacity: 0.8 }}>✨</div>
+                  )}
 
-          <div
-            style={{
-              position: "absolute",
-              right: 8,
-              bottom: 6,
-              fontSize: 12,
-              fontWeight: 900,
-              color: "#ffcc66",
-              textShadow: "0 2px 6px rgba(0,0,0,0.6)",
-            }}
-          >
-            x{it.qty ?? 1}
-          </div>
-        </>
-      )}
-    </div>
-  );
-})}
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: 8,
+                      bottom: 6,
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: "#ffcc66",
+                      textShadow: "0 2px 6px rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    x{it.qty ?? 1}
+                  </div>
+
+                  {/* ✅ 靈獸蛋可使用 */}
+                  {it.id === "egg_001" && !it.activated && typeof onUseItem === "function" && (
+                    <button
+                      className="rpg-btn sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUseItem(it);
+                      }}
+                      style={{
+                        position: "absolute",
+                        left: 6,
+                        bottom: 6,
+                        fontSize: 11,
+                        padding: "2px 8px",
+                      }}
+                    >
+                      使用
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ height: 10 }} />
       <div style={{ fontSize: 12, opacity: 0.75 }}>
-        （目前先做展示）之後如果要「點格子 → 顯示詳情/使用/裝備」，我再幫你加第二層彈窗。
+        靈獸蛋可在背包中點選「使用」，用來正式開啟靈獸系統。
       </div>
     </Modal>
   );

@@ -16,7 +16,7 @@ import {
 
 import TreasureShop from "../components/TreasureShop";
 import { SHOP_ITEMS } from "../data/shopItems";
-import { PETS_MASTER, createPetDoc } from "../data/pets";
+import { PETS_MASTER, createPetDoc, calcPetPower } from "../data/pets";
 import BackpackModal from "../components/BackpackModal";
 import PetHatchModal from "../components/PetHatchModal";
 
@@ -560,6 +560,12 @@ export default function StudentPage() {
     return petList.find((p) => p.petId === selectedPetId) || petList[0] || null;
   }, [petList, selectedPetId]);
 
+// 🐾 計算目前出戰靈寵戰力（與靈寵視窗同公式）
+
+const studentPower = Number(student?.cp || 0);
+const petPower = Number(student?.currentPetPower || 0);
+const totalPower = studentPower + petPower;
+
   if (msg) {
     return (
       <div style={{ maxWidth: 860, margin: "60px auto", fontFamily: "sans-serif", color: "#fff" }}>
@@ -786,7 +792,7 @@ export default function StudentPage() {
         <div style={{ height: 12 }} />
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.9 }}>
           <div style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>戰力：{student.cp ?? 0}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>戰力：{totalPower}</div>
           <div style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
           <div style={{ fontSize: 20, fontWeight: 800 }}>靈寵碎片：{Number(student.petShard || 0)}</div>
         </div>

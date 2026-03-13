@@ -287,39 +287,43 @@ export default function PetHatchModal({
   }
 
   async function equipPet(pet) {
-    if (!studentPath?.classId || !studentPath?.studentId) return toast("尚未取得 studentPath");
+  if (!studentPath?.classId || !studentPath?.studentId) return toast("尚未取得 studentPath");
 
-    const { classId, studentId } = studentPath;
-    const studentRef = doc(db, "classes", classId, "students", studentId);
-    const petRef = doc(db, "classes", classId, "students", studentId, "pets", pet.petId);
+  const { classId, studentId } = studentPath;
+  const studentRef = doc(db, "classes", classId, "students", studentId);
+  const petRef = doc(db, "classes", classId, "students", studentId, "pets", pet.petId);
 
-    try {
-      await runTransaction(db, async (tx) => {
-        const sSnap = await tx.get(studentRef);
-        const pSnap = await tx.get(petRef);
+  try {
+    await runTransaction(db, async (tx) => {
+      const sSnap = await tx.get(studentRef);
+      const pSnap = await tx.get(petRef);
 
-        if (!sSnap.exists()) throw new Error("找不到學生資料");
-        if (!pSnap.exists()) throw new Error("找不到靈寵資料");
+      if (!sSnap.exists()) throw new Error("找不到學生資料");
+      if (!pSnap.exists()) throw new Error("找不到靈寵資料");
 
-        tx.update(studentRef, {
-          currentPetId: pet.petId,
-          currentPetName: pet.name,
-          currentPetIcon: pet.icon,
-          updatedAt: serverTimestamp(),
-        });
+      const petData = pSnap.data() || {};
+      const nextPetPower = calcPetPower(petData);
 
-        tx.update(petRef, {
-          equipped: true,
-          updatedAt: serverTimestamp(),
-        });
+      tx.update(studentRef, {
+        currentPetId: pet.petId,
+        currentPetName: pet.name,
+        currentPetIcon: pet.icon,
+        currentPetPower: nextPetPower, // ✅ 新增
+        updatedAt: serverTimestamp(),
       });
 
-      toast(`✅ 已讓 ${pet.name} 出戰`);
-    } catch (e) {
-      console.error(e);
-      toast(e?.message || "出戰失敗");
-    }
+      tx.update(petRef, {
+        equipped: true,
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    toast(`✅ 已讓 ${pet.name} 出戰`);
+  } catch (e) {
+    console.error(e);
+    toast(e?.message || "出戰失敗");
   }
+}
 
   async function levelUpPet(pet) {
     if (!studentPath?.classId || !studentPath?.studentId) return toast("尚未取得 studentPath");
@@ -329,7 +333,8 @@ export default function PetHatchModal({
 
     const { classId, studentId } = studentPath;
     const petRef = doc(db, "classes", classId, "students", studentId, "pets", pet.petId);
-    const foodRef = doc(db, "classes", classId, "students", studentId, "inventory", foodToConsumeId);
+const foodRef = doc(db, "classes", classId, "students", studentId, "inventory", foodToConsumeId);
+const studentRef = doc(db, "classes", classId, "students", studentId);
 
     try {
       await runTransaction(db, async (tx) => {
@@ -365,6 +370,22 @@ export default function PetHatchModal({
           spd: newStats.spd,
           updatedAt: serverTimestamp(),
         });
+
+        if (student?.currentPetId === pet.petId) {
+  const nextPetPower = calcPetPower({
+    ...petData,
+    level: newLevel,
+    hp: newStats.hp,
+    atk: newStats.atk,
+    spd: newStats.spd,
+  });
+
+  tx.update(studentRef, {
+    currentPetPower: nextPetPower,
+    updatedAt: serverTimestamp(),
+  });
+}
+
       });
 
       toast(`✅ ${pet.name} 升到 Lv.${Number(pet.level || 1) + 1}`);
@@ -430,6 +451,23 @@ export default function PetHatchModal({
           spd: newStats.spd,
           updatedAt: serverTimestamp(),
         });
+
+        if (student?.currentPetId === pet.petId) {
+  const nextPetPower = calcPetPower({
+    ...petData,
+    star: newStar,
+    level: newLevel,
+    hp: newStats.hp,
+    atk: newStats.atk,
+    spd: newStats.spd,
+  });
+
+  tx.update(studentRef, {
+    currentPetPower: nextPetPower,
+    updatedAt: serverTimestamp(),
+  });
+}
+
       });
 
       toast(`⭐ ${pet.name} 已升到 ${currentStarValue + 1} 星，等級重置為 Lv1`);

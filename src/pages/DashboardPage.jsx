@@ -631,7 +631,7 @@ const sortedStudents = useMemo(() => {
               <td align="center"><HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} /></td>
               <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.xp ?? 0}</div></td>
               <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.coin ?? 0}</div></td>
-              <td align="center"><div style={{ fontSize: 20, fontWeight: 800, color: "#ff884d" }}>{s.cp ?? 0}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 800, color: "#ff884d" }}>{Number(s.cp ?? 0) + Number(s.currentPetPower ?? 0)}</div></td>
               <td align="center">
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, 10)}>✅ 答對</button>{" "}
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, -5)}>❌ 答錯</button>{" "}

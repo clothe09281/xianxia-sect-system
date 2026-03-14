@@ -109,6 +109,10 @@ export default function StudentPage() {
   const [openPetModal, setOpenPetModal] = useState(false);
   const [openWeaponModal, setOpenWeaponModal] = useState(false);
   const [openFashionModal, setOpenFashionModal] = useState(false);
+  // ===============================
+// 性別選擇
+// ===============================
+const [openGenderModal, setOpenGenderModal] = useState(false);
 
   const [openEggModal, setOpenEggModal] = useState(false);
   const eggRewardRunningRef = useRef(false);
@@ -313,6 +317,20 @@ export default function StudentPage() {
     eggRewardRunningRef.current = false;
   }, [student?.level, student?.eggRewardClaimed, studentPath?.classId, studentPath?.studentId]);
 
+  // ===============================
+// 第一次登入：若尚未選 gender，跳出性別選擇
+// ===============================
+useEffect(() => {
+  if (!student) return;
+
+  // gender 尚未設定時才開啟
+  if (!student.gender) {
+    setOpenGenderModal(true);
+  } else {
+    setOpenGenderModal(false);
+  }
+}, [student]);
+
   async function acceptEggReward() {
     if (!studentPath?.classId || !studentPath?.studentId) return;
 
@@ -405,6 +423,33 @@ export default function StudentPage() {
       alert(e?.message || "使用失敗");
     }
   }
+
+  // ===============================
+// 第一次選擇性別（只能選一次）
+// ===============================
+async function chooseGender(genderValue) {
+  if (!studentPath?.classId || !studentPath?.studentId) return;
+
+  const sRef = doc(
+    db,
+    "classes",
+    studentPath.classId,
+    "students",
+    studentPath.studentId
+  );
+
+  try {
+    await updateDoc(sRef, {
+      gender: genderValue, // "male" 或 "female"
+      updatedAt: serverTimestamp(),
+    });
+
+    setOpenGenderModal(false);
+  } catch (e) {
+    console.error("chooseGender error:", e);
+    alert(e?.message || "設定性別失敗");
+  }
+}
 
   async function equipTitle(title) {
     if (!classId || !studentId) return;
@@ -723,6 +768,59 @@ const totalPower = studentPower + petPower;
         </div>
       </Modal>
 
+      {/* ===================== 第一次登入性別選擇 ===================== */}
+<Modal
+  open={openGenderModal}
+  title="請選擇你的弟子性別"
+  onClose={() => {}}
+  width={520}
+>
+  <div style={{ textAlign: "center", opacity: 0.9, marginBottom: 14 }}>
+    此設定每個帳號只能選擇一次，之後不可更改。
+  </div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 20,
+      alignItems: "start",
+    }}
+  >
+    {/* 男生 */}
+    <div
+      onClick={() => chooseGender("male")}
+      style={{
+        cursor: "pointer",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 16,
+        background: "rgba(255,255,255,0.04)",
+        padding: 16,
+        textAlign: "center",
+      }}
+    >
+      
+      <div style={{ fontSize: 18, fontWeight: 900 }}>♂️ 男</div>
+    </div>
+
+    {/* 女生 */}
+    <div
+      onClick={() => chooseGender("female")}
+      style={{
+        cursor: "pointer",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 16,
+        background: "rgba(255,255,255,0.04)",
+        padding: 16,
+        textAlign: "center",
+      }}
+    >
+      
+      <div style={{ fontSize: 18, fontWeight: 900 }}>♀️ 女</div>
+    </div>
+  </div>
+</Modal>
+
       <PetHatchModal
         open={openPetModal}
         onClose={() => setOpenPetModal(false)}
@@ -766,42 +864,79 @@ const totalPower = studentPower + petPower;
       </Modal>
 
       <div
+  style={{
+    marginTop: 14,
+    padding: 18,
+    border: "1px solid rgba(218,185,120,0.35)",
+    borderRadius: 12,
+    background: "rgba(20,20,20,0.85)",
+    display: "grid",
+    gridTemplateColumns: "1fr 220px",
+    gap: 18,
+    alignItems: "center",
+  }}
+>
+  {/* 左側資訊 */}
+  <div>
+    <div style={{ fontSize: 30, fontWeight: 800 }}>
+      {student.name}
+      {student.activeTitle ? (
+        <span style={{ marginLeft: 10, fontSize: 18, opacity: 10, color: "#ffd700" }}>
+          {student.activeTitle}
+        </span>
+      ) : null}
+      <span style={{ fontSize: 14, opacity: 0.85, marginLeft: 10 }}>
+        Lv {student.level ?? 1}
+      </span>
+    </div>
+
+    <div style={{ height: 10 }} />
+    <HPBar now={student.hpNow ?? 100} max={student.hpMax ?? 100} />
+
+    <div style={{ height: 12 }} />
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.9 }}>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>戰力：{totalPower}</div>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>靈寵碎片：{Number(student.petShard || 0)}</div>
+    </div>
+
+    <div style={{ height: 6 }} />
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.85 }}>
+      <div>👤 弟子戰力：{studentPower}</div>
+      <div>🐾 靈寵特性增加：{petPower}</div>
+    </div>
+
+    <div style={{ height: 10 }} />
+    <div style={{ fontSize: 12, opacity: 0.7 }}>
+      班級代碼：{meIndex?.classCode || "—"}　|　弟子ID：{meIndex?.studentId || "—"}
+    </div>
+  </div>
+
+  {/* 右側角色圖 */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 180,
+    }}
+  >
+    {student.gender ? (
+      <img
+        src={student.gender === "female" ? "/characters/girl.png" : "/characters/boy.png"}
+        alt={student.gender === "female" ? "女弟子" : "男弟子"}
         style={{
-          marginTop: 14,
-          padding: 18,
-          border: "1px solid rgba(218,185,120,0.35)",
-          borderRadius: 12,
-          background: "rgba(20,20,20,0.85)",
+          maxWidth: "100%",
+          maxHeight: 220,
+          objectFit: "contain",
         }}
-      >
-        <div style={{ fontSize: 30, fontWeight: 800 }}>
-          {student.name}
-          {student.activeTitle ? (
-            <span style={{ marginLeft: 10, fontSize: 18, opacity: 10, color: "#ffd700" }}>
-              {student.activeTitle}
-            </span>
-          ) : null}
-          <span style={{ fontSize: 14, opacity: 0.85, marginLeft: 10 }}>
-            Lv {student.level ?? 1}
-          </span>
-        </div>
-
-        <div style={{ height: 10 }} />
-        <HPBar now={student.hpNow ?? 100} max={student.hpMax ?? 100} />
-
-        <div style={{ height: 12 }} />
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", opacity: 0.9 }}>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>修為：{student.xp ?? 0}</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>戰力：{totalPower}</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>妖丹：{student.coin ?? 0}</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>靈寵碎片：{Number(student.petShard || 0)}</div>
-        </div>
-
-        <div style={{ height: 10 }} />
-        <div style={{ fontSize: 12, opacity: 0.7 }}>
-          班級代碼：{meIndex?.classCode || "—"}　|　弟子ID：{meIndex?.studentId || "—"}
-        </div>
-      </div>
+      />
+    ) : (
+      <div style={{ opacity: 0.35, fontSize: 14 }}>尚未選擇性別</div>
+    )}
+  </div>
+</div>
 
       <div style={{ height: 16 }} />
 

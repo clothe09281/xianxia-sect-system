@@ -16,7 +16,12 @@ import {
   getDocs,
   arrayUnion,
   writeBatch,
+  runTransaction,
 } from "firebase/firestore";
+import {
+  getDropBoostPercent,
+  calcCoinBoostExtra,
+} from "../data/weapons";
 import { useNavigate } from "react-router-dom";
 
 // 🏮 藏寶閣商品
@@ -148,6 +153,14 @@ export default function DashboardPage() {
   const [targetUnlockedAchIds, setTargetUnlockedAchIds] = useState(new Set());
 
   const navigate = useNavigate();
+
+  //戰力榜
+  const powerRankList = [...students]
+  .filter((s) => s && s.name)
+  .sort((a, b) => getStudentDisplayPower(b) - getStudentDisplayPower(a));
+
+const topOne = powerRankList[0];
+const topPower = getStudentDisplayPower(topOne);
 
   // ===== 成就CSV匯入 =====
 const [openImportAch, setOpenImportAch] = useState(false);
@@ -302,6 +315,28 @@ const [importing, setImporting] = useState(false);
     setAnswererId(null);
   }
 
+  function getDropBoostEffectSummary(inventoryDocs = []) {
+  const lines = [];
+
+  for (const item of inventoryDocs) {
+    const effects = Array.isArray(item?.extraEffects) ? item.extraEffects : [];
+    for (const ef of effects) {
+      if (ef?.effectType === "drop_boost") {
+        lines.push(`${ef.quality}｜掉寶收益加成｜+${ef.value}`);
+      }
+    }
+  }
+
+  return lines;
+}
+
+  // ===============================
+// 🎲 基本機率判定
+// ===============================
+function rollDrop(rate) {
+  return Math.random() < rate;
+}
+
   function closeRaidModal() {
     setOpenRaid(false);
     setShowBattle(false);
@@ -359,6 +394,237 @@ const [importing, setImporting] = useState(false);
     setAnswererId(null);
     alert("已發放獎勵 ✅");
   }
+
+// ===============================
+// 🎁 發放歷練獎勵
+// 參與答題的弟子：
+// - 妖丹基礎獎勵 100
+// - 神兵特效可影響妖丹收益 / 掉寶收益
+// - 50% 隕鐵結晶
+// - 40% 鍛兵石
+// - 3% 玄鐵（稀有掉落）
+// ===============================
+async function handlePracticeRewards(students = []) {
+  if (!Array.isArray(students) || students.length === 0) {
+    alert("沒有可發放獎勵的弟子");
+    return;
+  }
+
+  try {
+    for (const stu of students) {
+      const { classId, studentId, name } = stu;
+
+      if (!classId || !studentId) {
+        console.warn("缺少 classId 或 studentId：", stu);
+        continue;
+      }
+
+      await runTransaction(db, async (tx) => {
+        const studentRef = doc(db, "classes", classId, "students", studentId);
+
+        // 掉落素材 refs
+        const meteorRef = doc(
+          db,
+          "classes",
+          classId,
+          "students",
+          studentId,
+          "inventory",
+          "mat_meteor_crystal"
+        );
+
+        const forgeRef = doc(
+          db,
+          "classes",
+          classId,
+          "students",
+          studentId,
+          "inventory",
+          "mat_forge_stone"
+        );
+
+        const blackIronRef = doc(
+          db,
+          "classes",
+          classId,
+          "students",
+          studentId,
+          "inventory",
+          "mat_black_iron"
+        );
+
+        // ===============================
+        // 1) 先把所有需要讀的文件全部讀完
+        // ===============================
+        const studentSnap = await tx.get(studentRef);
+        if (!studentSnap.exists()) throw new Error("找不到學生資料");
+
+        const studentData = studentSnap.data() || {};
+        const coinNow = Number(studentData.coin || 0);
+
+        // 已裝備神兵（從 student 主檔摘要）
+        const equippedWeapons = Array.isArray(studentData.equippedWeapons)
+          ? studentData.equippedWeapons
+          : [];
+
+        // 讀取已裝備神兵的 inventory 文件（用來算特效）
+        const inventoryWeaponDocs = [];
+        for (const w of equippedWeapons) {
+          const wid = w?.weaponId;
+          if (!wid) continue;
+
+          const wRef = doc(
+            db,
+            "classes",
+            classId,
+            "students",
+            studentId,
+            "inventory",
+            wid
+          );
+          const wSnap = await tx.get(wRef);
+          if (wSnap.exists()) {
+            inventoryWeaponDocs.push({
+              id: wSnap.id,
+              itemId: wSnap.id,
+              ...wSnap.data(),
+            });
+          }
+        }
+
+        // 特效計算
+        const dropBoostPercent = getDropBoostPercent(inventoryWeaponDocs);
+
+        const baseCoinReward = 100;
+        const extraCoinReward = calcCoinBoostExtra(baseCoinReward, inventoryWeaponDocs);
+        const finalCoinReward = baseCoinReward + extraCoinReward;
+
+        // 掉率
+        const meteorRate = (50 + dropBoostPercent) / 100;
+        const forgeRate = (40 + dropBoostPercent) / 100;
+        const blackIronRate = (3 + dropBoostPercent) / 100;
+
+        const dropMeteor = rollDrop(meteorRate);
+        const dropForge = rollDrop(forgeRate);
+        const dropBlackIron = rollDrop(blackIronRate);
+
+        console.log("掉落判定", {
+          name,
+          classId,
+          studentId,
+          dropBoostPercent,
+          meteorRate,
+          forgeRate,
+          blackIronRate,
+          dropMeteor,
+          dropForge,
+          dropBlackIron,
+          baseCoinReward,
+          extraCoinReward,
+          finalCoinReward,
+        });
+
+        // 只有要掉落時才需要讀該素材文件
+        let meteorSnap = null;
+        let forgeSnap = null;
+        let blackIronSnap = null;
+
+        if (dropMeteor) {
+          meteorSnap = await tx.get(meteorRef);
+        }
+
+        if (dropForge) {
+          forgeSnap = await tx.get(forgeRef);
+        }
+
+        if (dropBlackIron) {
+          blackIronSnap = await tx.get(blackIronRef);
+        }
+
+        // ===============================
+        // 2) 讀完之後，才開始寫入
+        // ===============================
+
+        // 發妖丹
+        tx.update(studentRef, {
+          coin: coinNow + finalCoinReward,
+          updatedAt: serverTimestamp(),
+        });
+
+        // 隕鐵結晶
+        if (dropMeteor) {
+          if (!meteorSnap.exists()) {
+            tx.set(meteorRef, {
+              itemId: "mat_meteor_crystal",
+              name: "隕鐵結晶",
+              category: "weapon",
+              itemType: "material",
+              icon: "/merchandise/mat_meteor_crystal.png",
+              qty: 1,
+              acquiredAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            const qtyNow = Number(meteorSnap.data()?.qty || 0);
+            tx.update(meteorRef, {
+              qty: qtyNow + 1,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+
+        // 鍛兵石
+        if (dropForge) {
+          if (!forgeSnap.exists()) {
+            tx.set(forgeRef, {
+              itemId: "mat_forge_stone",
+              name: "鍛兵石",
+              category: "weapon",
+              itemType: "material",
+              icon: "/merchandise/mat_forge_stone.png",
+              qty: 1,
+              acquiredAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            const qtyNow = Number(forgeSnap.data()?.qty || 0);
+            tx.update(forgeRef, {
+              qty: qtyNow + 1,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+
+        // 玄鐵
+        if (dropBlackIron) {
+          if (!blackIronSnap.exists()) {
+            tx.set(blackIronRef, {
+              itemId: "mat_black_iron",
+              name: "玄鐵",
+              category: "weapon",
+              itemType: "material",
+              icon: "/merchandise/mat_black_iron.png",
+              qty: 1,
+              acquiredAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            const qtyNow = Number(blackIronSnap.data()?.qty || 0);
+            tx.update(blackIronRef, {
+              qty: qtyNow + 1,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      });
+    }
+
+    alert("🎁 歷練獎勵發放完成！");
+  } catch (e) {
+    console.error("handlePracticeRewards error:", e);
+    alert(e?.message || "發放獎勵失敗");
+  }
+}
 
   function normHeader(h) {
   return String(h || "").trim().replace(/\s+/g, "");
@@ -552,6 +818,19 @@ const sortedStudents = useMemo(() => {
 
   const top3 = useMemo(() => sortedStudents.slice(0, 3), [sortedStudents]);
 
+  // ===============================
+// 取得老師頁要顯示 / 排序用的最終戰力
+// 優先使用 finalPower，沒有時再 fallback 舊公式
+// ===============================
+function getStudentDisplayPower(s) {
+  const fallbackPower =
+    Number(s?.cp || 0) +
+    Number(s?.currentPetPower || 0) +
+    Number(s?.currentWeaponPower || 0);
+
+  return Number(s?.finalPower ?? fallbackPower);
+}
+
   return (
     <div style={{ width: "min(1400px, 96vw)", margin: "40px auto", fontFamily: "sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
@@ -629,9 +908,9 @@ const sortedStudents = useMemo(() => {
               </td>
               <td align="center"><div style={{ fontSize: 18, fontWeight: 700, color: "#ffcc66" }}>{s.level ?? 1}</div></td>
               <td align="center"><HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} /></td>
-              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.xp ?? 0}</div></td>
-              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{s.coin ?? 0}</div></td>
-              <td align="center"><div style={{ fontSize: 18, fontWeight: 800, color: "#ff884d" }}>{Number(s.cp ?? 0) + Number(s.currentPetPower ?? 0)}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{Number(s.finalXp ?? s.xp ?? 0)}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{Number(s.coin ?? 0)}</div></td>
+              <td align="center"><div style={{ fontSize: 18, fontWeight: 800, color: "#ff884d" }}>{Number(s.finalPower ?? (Number(s.cp ?? 0) + Number(s.currentPetPower ?? 0) + Number(s.currentWeaponPower ?? 0)))}</div></td>
               <td align="center">
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, 10)}>✅ 答對</button>{" "}
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, -5)}>❌ 答錯</button>{" "}
@@ -754,7 +1033,25 @@ const sortedStudents = useMemo(() => {
                 </button>
               </>
             ) : (
-              <button className="rpg-btn" onClick={finishWin}>🎉 勝利！領取獎勵</button>
+              <button
+  className="rpg-btn"
+  onClick={() =>
+    handlePracticeRewards(
+      raidParticipants
+        .map((sid) => {
+          const s = students.find((x) => x.id === sid);
+          return {
+            classId: classId,
+            studentId: s?.id,
+            name: s?.name,
+          };
+        })
+        .filter((x) => x.classId && x.studentId)
+    )
+  }
+>
+  🎁 發放歷練獎勵
+</button>
             )}
           </div>
 
@@ -1011,7 +1308,7 @@ const sortedStudents = useMemo(() => {
               letterSpacing: 1,
             }}
           >
-            {s.cp ?? 0}
+            {getStudentDisplayPower(s)}
           </div>
         </td>
       </tr>

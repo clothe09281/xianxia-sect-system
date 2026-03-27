@@ -821,7 +821,7 @@ const studentRef = doc(db, "classes", classId, "students", studentId);
                   </div>
 
                   <div style={{ marginTop: 6, opacity: 0.8 }}>
-                    為弟子增加戰力：<b>{petPower}</b>
+                    增加戰力：<b>{petPower}</b>
                   </div>
                 </div>
 
@@ -1157,7 +1157,7 @@ const studentRef = doc(db, "classes", classId, "students", studentId);
                   </div>
 
                   <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                    每個星級都可從 Lv1 升到 Lv10；升到 Lv10 後才可進行升星。
+                    升級 : 消耗天地靈寶*1，升到 Lv10 後才可進行升星。
                   </div>
                 </div>
 
@@ -1243,8 +1243,8 @@ const studentRef = doc(db, "classes", classId, "students", studentId);
                   </div>
 
                   <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                    升星需先達到 Lv10。1→2 星需 10 片，2→3 星需 20 片，3→4 星需 30 片，4→5 星需 40 片。
-                    升星後等級會重置為 Lv1，重新培養該星級。
+                    升星條件 : 需先達到 Lv10。
+                    升星後等級會重置為 Lv1。
                   </div>
                 </div>
 

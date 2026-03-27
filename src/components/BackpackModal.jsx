@@ -60,6 +60,170 @@ const TABS = [
   { key: "card", label: "卡片" },
 ];
 
+const ITEM_DESCRIPTIONS = {
+  // 🐾 靈獸蛋
+  egg_001: {
+    color: "#e8d9a3",
+    lines: [
+      "宗門獎勵的靈獸蛋",
+      "不知道是什麼品種",
+      "據說非常喜歡「天地靈寶」",
+    ],
+  },
+
+  // 🌿 天地靈寶（三種共用同一段）
+  mat_lingbao_001: {
+    color: "#9fe7c6",
+    lines: [
+      "傳說由上古宗師煉製而成",
+      "內藏天地初生之氣，可育萬靈",
+      "用於孵化靈獸與升級",
+    ],
+  },
+  mat_lingbao_002: {
+    color: "#9fe7c6",
+    lines: [
+      "傳說由上古宗師煉製而成",
+      "內藏天地初生之氣，可育萬靈",
+      "用於孵化靈獸與升級",
+    ],
+  },
+  mat_lingbao_003: {
+    color: "#9fe7c6",
+    lines: [
+      "傳說由上古宗師煉製而成",
+      "內藏天地初生之氣，可育萬靈",
+      "用於孵化靈獸與升級",
+    ],
+  },
+
+  // 🔨 鍛兵石
+  mat_forge_stone: {
+    color: "#f0c987",
+    lines: [
+      "鍛造神兵常用的基礎礦石",
+      "質地堅實，能穩固兵刃靈性",
+      "可用於神兵鍛造升級",
+    ],
+  },
+
+  // ☄️ 隕鐵結晶
+  mat_meteor_crystal: {
+    color: "#9fd6ff",
+    lines: [
+      "由天外隕鐵凝成的稀有結晶",
+      "蘊含沉重星火之力",
+      "可融合為更高階的玄鐵",
+    ],
+  },
+
+  // ⚫ 玄鐵
+  mat_black_iron: {
+    color: "#c9c9d4",
+    lines: [
+      "由隕鐵結晶融合後得到的高階靈鐵",
+      "可承載更強的兵魂與特殊效果",
+      "用於神兵精煉與特效洗練",
+    ],
+  },
+    // 🎴 特權卡
+  card_001: {
+    color: "#ffd59e",
+    lines: [
+      "減字訣",
+      "作業少寫一遍",
+    ],
+  },
+
+  card_002: {
+    color: "#b7d7ff",
+    lines: [
+      "雲影步",
+      "一次小遲到紀錄不列入",
+    ],
+  },
+
+  card_003: {
+    color: "#cbb8ff",
+    lines: [
+      "緩衝符",
+      "一次作業／報告可緩衝繳交",
+    ],
+  },
+
+  card_004: {
+    color: "#c7f0c2",
+    lines: [
+      "逍遙午休",
+      "午休可以選擇安靜做自己的事",
+    ],
+  },
+
+  card_005: {
+    color: "#ffe8a8",
+    lines: [
+      "靈光護體",
+      "一次上課發言錯誤不扣分／不記提醒",
+    ],
+  },
+
+  card_006: {
+    color: "#ffc9b5",
+    lines: [
+      "丹田補氣",
+      "獲得一次「小餅乾或運動飲料補氣」",
+    ],
+  },
+
+  card_007: {
+    color: "#ffcf7d",
+    lines: [
+      "妖丹進階",
+      "骰骰子數字 × 10 倍妖丹",
+    ],
+  },
+
+  card_008: {
+    color: "#9fe7ff",
+    lines: [
+      "移形換位",
+      "優先選座位",
+    ],
+  },
+
+  card_009: {
+    color: "#bcd4ff",
+    lines: [
+      "流光瞬移",
+      "一次優先選擇小組／活動順序",
+    ],
+  },
+
+  card_010: {
+    color: "#ffdca8",
+    lines: [
+      "天選福袋",
+      "禮物池自選一樣",
+    ],
+  },
+
+  card_011: {
+    color: "#e6d0ff",
+    lines: [
+      "天機一問",
+      "小考可向老師請求一次「提示指引」",
+    ],
+  },
+
+  card_012: {
+    color: "#ffe39a",
+    lines: [
+      "祕寶禮盒",
+      "師尊特製小禮物（限量）",
+    ],
+  },
+};
+
 function TabBtn({ active, onClick, children }) {
   return (
     <button
@@ -96,6 +260,7 @@ export default function BackpackModal({
 }) {
   const [tab, setTab] = useState("pet");
   const [selectedItem, setSelectedItem] = useState(null);
+  const selectedItemDesc = selectedItem ? ITEM_DESCRIPTIONS[selectedItem.id] : null;
 
   function sumEquippedWeaponPower(equippedWeapons = []) {
   return equippedWeapons.reduce((sum, w) => {
@@ -203,6 +368,60 @@ function sumEquippedWeaponXpBonus(equippedWeapons = []) {
   } catch (e) {
     console.error("equipWeapon error:", e);
     alert(e?.message || "裝備失敗");
+  }
+}
+
+async function useCardItem(item) {
+  if (!studentPath?.classId || !studentPath?.studentId) {
+    alert("尚未取得 studentPath");
+    return;
+  }
+
+  if (!item?.id) {
+    alert("找不到道具資料");
+    return;
+  }
+
+  const classId = studentPath.classId;
+  const studentId = studentPath.studentId;
+
+  const itemRef = doc(
+    db,
+    "classes",
+    classId,
+    "students",
+    studentId,
+    "inventory",
+    item.id
+  );
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(itemRef);
+      if (!snap.exists()) throw new Error("找不到此道具");
+
+      const data = snap.data() || {};
+      const qtyNow = Number(data.qty || 0);
+
+      if (qtyNow <= 0) throw new Error("此道具數量不足");
+
+      // ✅ 只有 1 張：直接刪除
+      if (qtyNow === 1) {
+        tx.delete(itemRef);
+      } else {
+        // ✅ 多於 1 張：數量 -1
+        tx.update(itemRef, {
+          qty: qtyNow - 1,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    alert(`✅ 已使用特權卡：${item.name}`);
+    setSelectedItem(null);
+  } catch (e) {
+    console.error("useCardItem error:", e);
+    alert(e?.message || "使用失敗");
   }
 }
 
@@ -459,34 +678,52 @@ function sumEquippedWeaponXpBonus(equippedWeapons = []) {
 
         <div>
           <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedItem.name}</div>
+          <div style={{ marginTop: 6, opacity: 0.9 }}>
+  {selectedItemDesc ? (
+    <div style={{ lineHeight: 1.6, color: selectedItemDesc.color || "#e8d9a3" }}>
+      {selectedItemDesc.lines.map((line, idx) => (
+        <div key={idx}>✦ {line}</div>
+      ))}
+    </div>
+  ) : (
+    <div style={{ opacity: 0.7 }}>
+      類型：{selectedItem?.category}
+    </div>
+  )}
+</div>
           <div style={{ marginTop: 6, opacity: 0.8 }}>
             數量：x{Number(selectedItem.qty || 1)}
-          </div>
-          <div style={{ marginTop: 6, opacity: 0.8 }}>
-            類型：{selectedItem.category || "未知"}
           </div>
         </div>
       </div>
 
       <div style={{ height: 18 }} />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <button className="rpg-btn" onClick={() => setSelectedItem(null)}>
-          關閉
-        </button>
+<div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
 
-        {selectedItem.id === "egg_001" && (
-          <button
-            className="rpg-btn"
-            onClick={() => {
-              onUseItem?.(selectedItem);
-              setSelectedItem(null);
-            }}
-          >
-            使用
-          </button>
-        )}
-      </div>
+  {/* 靈獸蛋 */}
+  {selectedItem.id === "egg_001" && (
+    <button
+      className="rpg-btn"
+      onClick={() => {
+        onUseItem?.(selectedItem);
+        setSelectedItem(null);
+      }}
+    >
+      使用
+    </button>
+  )}
+
+  {/* 特權卡 */}
+  {selectedItem.category === "card" && (
+    <button
+      className="rpg-btn"
+      onClick={() => useCardItem(selectedItem)}
+    >
+      使用
+    </button>
+  )}
+</div>
     </div>
   )}
 </Modal>

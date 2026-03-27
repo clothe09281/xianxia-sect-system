@@ -207,78 +207,22 @@ export const SHOP_ITEMS = [
   // ⚒️ 神兵材料
   // 購買後：進 inventory（背包）
   // =========================
-  {
-    id: "mat_forge_stone",
-    tab: "weapon",
-    itemType: "material",
-    name: "鍛兵石",
-    desc: "用於神兵鍛造升級。",
-    price: 80,
-    icon: "/merchandise/mat_forge_stone.png",
-    badge: "神兵素材",
-  },
-  {
-    id: "mat_meteor_crystal",
-    tab: "weapon",
-    itemType: "material",
-    name: "隕鐵結晶",
-    desc: "可用於融合玄鐵的稀有礦晶。",
-    price: 120,
-    icon: "/merchandise/mat_meteor_crystal.png",
-    badge: "神兵素材",
-  },
-  {
-    id: "mat_black_iron",
-    tab: "weapon",
-    itemType: "material",
-    name: "玄鐵",
-    desc: "用於神兵精煉與特殊效果洗練。",
-    price: 500,
-    icon: "/merchandise/mat_black_iron.png",
-    badge: "高階素材",
-  },
-
+  
+  
 // =========================
   // 🎫 特權卡
   // 購買後：進 inventory / card
   // =========================
-  {
-    id: "card_001",
-    tab: "privilege",
-    itemType: "card",
-    name: "減字訣",
-    desc: "作業少寫一遍。",
-    price: 700,
-    icon: "/merchandise/card_item_001.png",
-    badge: "特權",
-  },
-  {
-    id: "card_002",
-    tab: "privilege",
-    itemType: "card",
-    name: "雲影步",
-    desc: "一次小遲到紀錄不列入。",
-    price: 700,
-    icon: "/merchandise/card_item_002.png",
-    badge: "特權",
-  },
-  {
-    id: "card_003",
-    tab: "privilege",
-    itemType: "card",
-    name: "緩衝符",
-    desc: "一次作業／報告可緩衝繳交。",
-    price: 700,
-    icon: "/merchandise/card_item_003.png",
-    badge: "特權",
-  },
-  { id: "card_004", tab: "privilege", name: "逍遙午休", desc: "午休可以選擇安靜做自己的事", price: 700, icon: "/merchandise/card_item_004.png" },
-  { id: "card_005", tab: "privilege", name: "靈光護體", desc: "一次上課發言錯誤不扣分／不記提醒", price: 700, icon: "/merchandise/card_item_005.png" },
-  { id: "card_006", tab: "privilege", name: "丹田補氣", desc: "獲得一次「小餅乾或運動飲料補氣」", price: 700, icon: "/merchandise/card_item_006.png" },
-  { id: "card_007", tab: "privilege", name: "妖丹進階", desc: "骰骰子數字*20倍妖丹", price: 250, icon: "/merchandise/card_item_007.png" },
-  { id: "card_008", tab: "privilege", name: "移形換位", desc: "優先選座位", price: 800, icon: "/merchandise/card_item_008.png" },
-  { id: "card_009", tab: "privilege", name: "流光瞬移", desc: "一次優先選擇小組／活動順序", price: 800, icon: "/merchandise/card_item_009.png" },
-  { id: "card_010", tab: "privilege", name: "天選福袋", desc: "禮物池自選一樣", price: 800, icon: "/merchandise/card_item_010.png" },
-  { id: "card_011", tab: "privilege", name: "天機一問", desc: "小考可向老師請求一次「提示指引」", price: 900, icon: "/merchandise/card_item_011.png" },
-  { id: "card_012", tab: "privilege", name: "祕寶禮盒", desc: "師尊特製小禮物（限量）", price: 950, icon: "/merchandise/card_item_012.png" },  
+  { id: "card_001", tab: "privilege", itemType: "card", name: "減字訣", desc: "作業少寫一遍。", price: 700, icon: "/merchandise/card_item_001.png", badge: "特權", },
+  { id: "card_002", tab: "privilege", itemType: "card", name: "雲影步", desc: "一次小遲到紀錄不列入。", price: 700, icon: "/merchandise/card_item_002.png", badge: "特權", },
+  { id: "card_003", tab: "privilege", itemType: "card", name: "緩衝符", desc: "一次作業／報告可緩衝繳交。", price: 700, icon: "/merchandise/card_item_003.png", badge: "特權", },
+  { id: "card_004", tab: "privilege", itemType: "card", name: "逍遙午休", desc: "午休可以選擇安靜做自己的事", price: 700, icon: "/merchandise/card_item_004.png", badge: "特權", },
+  { id: "card_005", tab: "privilege", itemType: "card", name: "靈光護體", desc: "一次上課發言錯誤不扣分／不記提醒", price: 700, icon: "/merchandise/card_item_005.png", badge: "特權", },
+  { id: "card_006", tab: "privilege", itemType: "card", name: "丹田補氣", desc: "獲得一次「小餅乾或運動飲料補氣」", price: 700, icon: "/merchandise/card_item_006.png", badge: "特權", },
+  { id: "card_007", tab: "privilege", itemType: "card", name: "妖丹進階", desc: "骰骰子數字*20倍妖丹", price: 250, icon: "/merchandise/card_item_007.png", badge: "特權", },
+  { id: "card_008", tab: "privilege", itemType: "card", name: "移形換位", desc: "優先選座位", price: 800, icon: "/merchandise/card_item_008.png", badge: "特權", },
+  { id: "card_009", tab: "privilege", itemType: "card", name: "流光瞬移", desc: "一次優先選擇小組／活動順序", price: 800, icon: "/merchandise/card_item_009.png", badge: "特權", },
+  { id: "card_010", tab: "privilege", itemType: "card", name: "天選福袋", desc: "禮物池自選一樣", price: 800, icon: "/merchandise/card_item_010.png", badge: "特權", },
+  { id: "card_011", tab: "privilege", itemType: "card", name: "天機一問", desc: "小考可向老師請求一次「提示指引」", price: 900, icon: "/merchandise/card_item_011.png", badge: "特權", },
+  { id: "card_012", tab: "privilege", itemType: "card", name: "祕寶禮盒", desc: "師尊特製小禮物（限量）", price: 950, icon: "/merchandise/card_item_012.png", badge: "特權", },  
 ];

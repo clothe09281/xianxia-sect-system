@@ -99,7 +99,7 @@ export const SHOP_ITEMS = [
     name: "青雲短刃",
     desc: "輕靈迅捷，適合敏捷型修士。",
     price: 320,
-    icon: "/merchandise/weapon_001.png",
+    icon: "/merchandise/weapon_001-3.png",
     badge: "神兵",
     requiredLevel: 20,
   },

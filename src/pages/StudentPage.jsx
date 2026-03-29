@@ -2372,7 +2372,7 @@ useEffect(() => {
   open={openBag}
   onClose={() => setOpenBag(false)}
   items={bagItems}
-  slotsPerTab={24}
+  slotsPerTab={16}
   onUseItem={handleUseItem}
   student={student}            // ✅ 新增
   studentPath={studentPath}    // ✅ 新增

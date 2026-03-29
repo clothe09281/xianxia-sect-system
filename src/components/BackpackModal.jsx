@@ -130,7 +130,6 @@ const ITEM_DESCRIPTIONS = {
   card_001: {
     color: "#ffd59e",
     lines: [
-      "減字訣",
       "作業少寫一遍",
     ],
   },
@@ -138,7 +137,6 @@ const ITEM_DESCRIPTIONS = {
   card_002: {
     color: "#b7d7ff",
     lines: [
-      "雲影步",
       "一次小遲到紀錄不列入",
     ],
   },
@@ -146,7 +144,6 @@ const ITEM_DESCRIPTIONS = {
   card_003: {
     color: "#cbb8ff",
     lines: [
-      "緩衝符",
       "一次作業／報告可緩衝繳交",
     ],
   },
@@ -154,7 +151,6 @@ const ITEM_DESCRIPTIONS = {
   card_004: {
     color: "#c7f0c2",
     lines: [
-      "逍遙午休",
       "午休可以選擇安靜做自己的事",
     ],
   },
@@ -162,7 +158,6 @@ const ITEM_DESCRIPTIONS = {
   card_005: {
     color: "#ffe8a8",
     lines: [
-      "靈光護體",
       "一次上課發言錯誤不扣分／不記提醒",
     ],
   },
@@ -170,7 +165,6 @@ const ITEM_DESCRIPTIONS = {
   card_006: {
     color: "#ffc9b5",
     lines: [
-      "丹田補氣",
       "獲得一次「小餅乾或運動飲料補氣」",
     ],
   },
@@ -178,7 +172,6 @@ const ITEM_DESCRIPTIONS = {
   card_007: {
     color: "#ffcf7d",
     lines: [
-      "妖丹進階",
       "骰骰子數字 × 10 倍妖丹",
     ],
   },
@@ -186,7 +179,6 @@ const ITEM_DESCRIPTIONS = {
   card_008: {
     color: "#9fe7ff",
     lines: [
-      "移形換位",
       "優先選座位",
     ],
   },
@@ -194,7 +186,6 @@ const ITEM_DESCRIPTIONS = {
   card_009: {
     color: "#bcd4ff",
     lines: [
-      "流光瞬移",
       "一次優先選擇小組／活動順序",
     ],
   },
@@ -202,7 +193,6 @@ const ITEM_DESCRIPTIONS = {
   card_010: {
     color: "#ffdca8",
     lines: [
-      "天選福袋",
       "禮物池自選一樣",
     ],
   },
@@ -210,7 +200,6 @@ const ITEM_DESCRIPTIONS = {
   card_011: {
     color: "#e6d0ff",
     lines: [
-      "天機一問",
       "小考可向老師請求一次「提示指引」",
     ],
   },
@@ -218,7 +207,6 @@ const ITEM_DESCRIPTIONS = {
   card_012: {
     color: "#ffe39a",
     lines: [
-      "祕寶禮盒",
       "師尊特製小禮物（限量）",
     ],
   },
@@ -252,7 +240,7 @@ export default function BackpackModal({
   open,
   onClose,
   items = [],
-  slotsPerTab = 24,
+  slotsPerTab = 16,    // 背包格數
   width = 980,
   onUseItem,
   student,        // ✅ 新增
@@ -371,6 +359,68 @@ function sumEquippedWeaponXpBonus(equippedWeapons = []) {
   }
 }
 
+async function unequipWeapon(item) {
+  if (!studentPath?.classId || !studentPath?.studentId) {
+    return alert("尚未取得 studentPath");
+  }
+  if (!student) return alert("尚未取得學生資料");
+
+  const classId = studentPath.classId;
+  const studentId = studentPath.studentId;
+
+  const studentRef = doc(db, "classes", classId, "students", studentId);
+  const weaponRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const sSnap = await tx.get(studentRef);
+      const wSnap = await tx.get(weaponRef);
+
+      if (!sSnap.exists()) throw new Error("找不到學生資料");
+      if (!wSnap.exists()) throw new Error("找不到神兵資料");
+
+      const sData = sSnap.data() || {};
+      const weaponData = wSnap.data() || {};
+
+      if (!weaponData.equipped) {
+        throw new Error("此神兵目前未裝備");
+      }
+
+      const equippedWeapons = Array.isArray(sData.equippedWeapons)
+        ? [...sData.equippedWeapons]
+        : [];
+
+      const nextEquippedWeapons = equippedWeapons.filter((w) => w.weaponId !== item.id);
+
+      const totalWeaponPower = sumEquippedWeaponPower(nextEquippedWeapons);
+      const totalWeaponXpBonus = sumEquippedWeaponXpBonus(nextEquippedWeapons);
+
+      // 1) 神兵本體改為未裝備
+      tx.update(weaponRef, {
+        equipped: false,
+        updatedAt: serverTimestamp(),
+      });
+
+      // 2) 更新學生主檔的神兵摘要
+      tx.update(studentRef, {
+        equippedWeapons: nextEquippedWeapons,
+        currentWeaponId: nextEquippedWeapons[0]?.weaponId || "",
+        currentWeaponName: nextEquippedWeapons.map((w) => w.name).join("、"),
+        currentWeaponIcon: nextEquippedWeapons[0]?.icon || "",
+        currentWeaponPower: totalWeaponPower,
+        currentWeaponXpBonus: totalWeaponXpBonus,
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    alert(`✅ 已卸下神兵：${item.name}`);
+    setSelectedItem(null);
+  } catch (e) {
+    console.error("unequipWeapon error:", e);
+    alert(e?.message || "卸下失敗");
+  }
+}
+
 async function useCardItem(item) {
   if (!studentPath?.classId || !studentPath?.studentId) {
     alert("尚未取得 studentPath");
@@ -444,7 +494,7 @@ async function useCardItem(item) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
+          gridTemplateColumns: "repeat(4, 1fr)",
           gap: 10,
         }}
       >
@@ -619,37 +669,45 @@ async function useCardItem(item) {
       <div style={{ height: 18 }} />
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <button className="rpg-btn" onClick={() => setSelectedItem(null)}>
-          關閉
-        </button>
-
         <button
   className="rpg-btn"
-  onClick={() => equipWeapon(selectedItem)}
+  onClick={() => {
+    if (selectedItem.equipped) {
+      unequipWeapon(selectedItem);
+    } else {
+      equipWeapon(selectedItem);
+    }
+  }}
   disabled={
-    selectedItem.equipped ||
-    Number(student?.level || 1) < 20 ||
-    Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-    (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+    !selectedItem.equipped &&
+    (
+      Number(student?.level || 1) < 20 ||
+      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+    )
   }
   style={{
     opacity:
-      selectedItem.equipped ||
-      Number(student?.level || 1) < 20 ||
-      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+      !selectedItem.equipped &&
+      (
+        Number(student?.level || 1) < 20 ||
+        Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+        (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+      )
         ? 0.5
         : 1,
     cursor:
-      selectedItem.equipped ||
-      Number(student?.level || 1) < 20 ||
-      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+      !selectedItem.equipped &&
+      (
+        Number(student?.level || 1) < 20 ||
+        Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+        (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+      )
         ? "not-allowed"
         : "pointer",
   }}
 >
-  {selectedItem.equipped ? "已裝備" : "⚔️ 裝備"}
+  {selectedItem.equipped ? "卸下" : "⚔️ 裝備"}
 </button>
       </div>
     </div>

@@ -196,9 +196,15 @@ export default function TreasureShop({
                 <div style={{ fontWeight: 900, fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {it.name}
                 </div>
-                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4, lineHeight: 1.35 }}>
-                  {it.desc || "—"}
-                </div>
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4, lineHeight: 1.5 }}>
+  {tab === "weapon" && (
+    <div style={{ marginTop: 4, color: "#f5d27a" }}>
+      等級需求：Lv.{Number(it.requiredLevel || 1)}
+    </div>
+  )}
+
+  <div>{it.desc || "—"}</div>
+</div>
 
                 <div style={{ marginTop: 8, fontWeight: 900 }}>
                   💰 妖丹：<span style={{ color: "#FFD700" }}>{Number(it.price || 0)}</span>

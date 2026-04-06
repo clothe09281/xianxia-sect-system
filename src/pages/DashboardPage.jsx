@@ -1215,7 +1215,7 @@ function getStudentDisplayPower(s) {
             </tr>
           </thead>
           <tbody>
-  {students.map((s, idx) => {
+  {powerRankList.map((s, idx) => {
     const isTop1 = idx === 0;
     const isTop2 = idx === 1;
     const isTop3 = idx === 2;
@@ -1248,7 +1248,7 @@ function getStudentDisplayPower(s) {
                 : isTop3
                 ? "#CD7F32"
                 : "#fff",
-              textShadow: "0 0 6px rgba(255,215,0,0.6)"
+              textShadow: "0 0 6px rgba(255,215,0,0.6)",
             }}
           >
             {idx + 1}
@@ -1257,45 +1257,46 @@ function getStudentDisplayPower(s) {
 
         {/* 弟子 */}
         <td style={{ padding: 12 }}>
-  {/* 名字 + 等級 同一行 */}
-  <div
-    style={{
-      fontSize: 18,
-      fontWeight: 800,
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    }}
-  >
-    {s.name}
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            {s.name}
 
-    <span
-      style={{
-        fontSize: 14,
-        fontWeight: 600,
-        background: "rgba(255,255,255,0.1)",
-        padding: "2px 8px",
-        borderRadius: 6,
-      }}
-    >
-      Lv {s.level ?? 1}
-    </span>
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                background: "rgba(255,255,255,0.1)",
+                padding: "2px 8px",
+                borderRadius: 6,
+              }}
+            >
+              Lv {s.level ?? 1}
+            </span>
 
-    <span
-      style={{
-        marginTop: 6,
-        fontSize: 13,
-        fontWeight: 600,
-        color: "#FFD700",
-        background: "rgba(255,215,0,0.08)",
-        padding: "2px 8px",
-        borderRadius: 6,
-        display: "inline-block",
-      }}
-    >
-      {s.activeTitle}
-      </span>
-  </div>
+            {s.activeTitle ? (
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#FFD700",
+                  background: "rgba(255,215,0,0.08)",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  display: "inline-block",
+                }}
+              >
+                {s.activeTitle}
+              </span>
+            ) : null}
+          </div>
         </td>
 
         {/* 戰力 */}

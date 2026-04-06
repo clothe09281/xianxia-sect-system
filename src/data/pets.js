@@ -67,6 +67,138 @@ export const PETS_MASTER = {
     skillName: "白澤靈息",
     skillDesc: "回血或恢復類效果提高。",
   },
+
+  pet_004: {
+    id: "pet_004",
+    name: "赤焰幼龍",
+    icon: "/merchandise/pet_004.png",
+
+    baseHp: 110,
+    baseAtk: 18,
+    baseSpd: 6,
+
+    growHp: 14,
+    growAtk: 5,
+    growSpd: 1,
+
+    starBonusHp: 35,
+    starBonusAtk: 10,
+    starBonusSpd: 2,
+
+    passive: "戰力 +8%",
+    skillName: "焚天龍息",
+    skillDesc: "答題成功時，額外提升戰力收益。",
+  },
+
+  pet_005: {
+    id: "pet_005",
+    name: "星紋靈鹿",
+    icon: "/merchandise/pet_005.png",
+
+    baseHp: 120,
+  baseAtk: 12,
+  baseSpd: 8,
+
+  growHp: 15,
+  growAtk: 3,
+  growSpd: 2,
+
+  starBonusHp: 40,
+  starBonusAtk: 6,
+  starBonusSpd: 3,
+
+    passive: "修為收益 +10%",
+  skillName: "星痕指引",
+  skillDesc: "答題成功時，額外獲得修為加成。",
+  },
+
+  pet_006: {
+    id: "pet_006",
+    name: "流雲仙鶴",
+    icon: "/merchandise/pet_006.png",
+
+    baseHp: 100,
+  baseAtk: 11,
+  baseSpd: 12,
+
+  growHp: 12,
+  growAtk: 2,
+  growSpd: 3,
+
+  starBonusHp: 30,
+  starBonusAtk: 4,
+  starBonusSpd: 4,
+
+    passive: "經驗收益 +10%",
+  skillName: "雲羽流轉",
+  skillDesc: "答題後獲得的經驗值提升。",
+  },
+
+  pet_007: {
+    id: "pet_007",
+    name: "風行靈狼",
+    icon: "/merchandise/pet_007.png",
+
+    baseHp: 105,
+  baseAtk: 14,
+  baseSpd: 11,
+
+  growHp: 13,
+  growAtk: 4,
+  growSpd: 2,
+
+  starBonusHp: 32,
+  starBonusAtk: 8,
+  starBonusSpd: 3,
+
+    passive: "掉寶率 +8%",
+  skillName: "疾風追獵",
+  skillDesc: "歷練或答題後，提高掉落物品機率。",
+  },
+
+  pet_008: {
+    id: "pet_008",
+    name: "蒼穹古龍",
+    icon: "/merchandise/pet_008.png",
+
+    baseHp: 140,
+  baseAtk: 20,
+  baseSpd: 8,
+
+  growHp: 18,
+  growAtk: 6,
+  growSpd: 2,
+
+  starBonusHp: 50,
+  starBonusAtk: 12,
+  starBonusSpd: 3,
+
+    passive: "戰力 +12%",
+  skillName: "蒼天龍威",
+  skillDesc: "大幅提升戰力，並強化所有攻擊收益。",
+  },
+
+  pet_009: {
+    id: "pet_009",
+    name: "靜心靈熊",
+    icon: "/merchandise/pet_009.png",
+
+    baseHp: 160,
+  baseAtk: 10,
+  baseSpd: 4,
+
+  growHp: 20,
+  growAtk: 2,
+  growSpd: 1,
+
+  starBonusHp: 60,
+  starBonusAtk: 5,
+  starBonusSpd: 1,
+
+    passive: "妖丹收益 +10%",
+  skillName: "靜域守心",
+  skillDesc: "答題或歷練後，額外獲得妖丹收益。",
+  },
 };
 
 // 升星需求

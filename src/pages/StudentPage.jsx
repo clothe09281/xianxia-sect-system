@@ -2001,9 +2001,6 @@ useEffect(() => {
                   <div><b>鍛造後預計提升：</b></div>
                   <div>戰力小幅提升</div>
                   <div>修為小幅提升</div>
-                  <div style={{ opacity: 0.75, fontSize: 12 }}>
-                    （下一步再接入實際扣材料 / 扣妖丹 / 成功提示）
-                  </div>
                 </div>
 
                 <div style={{ height: 14 }} />
@@ -2194,7 +2191,7 @@ useEffect(() => {
                           目前階級：{selectedWeaponRefineStage} 階 / 3 階
                         </div>
                         <div style={{ marginTop: 4, opacity: 0.82 }}>
-                          精煉後圖片將變化
+                          精煉後圖片變化✨✨✨
                         </div>
                       </div>
                     </div>

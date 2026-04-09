@@ -269,9 +269,65 @@ const [importing, setImporting] = useState(false);
     setName("");
   }
 
-  async function addXP(id, v) {
-    await patchStudent(id, { xp: increment(v), cp: increment(v) });
+  
+
+// ===============================
+// 修為增減（答對 / 答錯）
+// ===============================
+async function addXP(id, v) {
+  const studentRef = doc(db, "classes", classId, "students", id);
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(studentRef);
+      if (!snap.exists()) throw new Error("找不到學生資料");
+
+      const s = snap.data() || {};
+
+      // ===============================
+      // 1️⃣ 基礎修為 xp（原本的）
+      // ===============================
+      const oldXp = Number(s.xp || 0);
+      const nextXp = Math.max(0, oldXp + Number(v || 0)); // 防止變負數
+
+      // ===============================
+      // 2️⃣ 神兵修為加成
+      // ===============================
+      const weaponXpBonus = Number(s.currentWeaponXpBonus || 0);
+
+      // ===============================
+      // 3️⃣ 特效修為加成（你之後會接完整系統）
+      // ===============================
+      const effectXpBonus = Number(s.effectXpBonus || 0);
+
+      // ===============================
+      // 4️⃣ 計算最終修為（🔥關鍵）
+      // ===============================
+      const nextFinalXp =
+        nextXp + weaponXpBonus + effectXpBonus;
+
+      // ===============================
+      // 5️⃣ 同步戰力（你原本有 cp increment）
+      // 👉 保留你的邏輯
+      // ===============================
+      const oldCp = Number(s.cp || 0);
+      const nextCp = Math.max(0, oldCp + Number(v || 0));
+
+      // ===============================
+      // 6️⃣ 寫回 Firestore
+      // ===============================
+      tx.update(studentRef, {
+        xp: nextXp,                  // 基礎修為
+        finalXp: nextFinalXp,        // 🔥 顯示用修為（重點）
+        cp: nextCp,                  // 原本戰力邏輯
+        updatedAt: serverTimestamp(),
+      });
+    });
+  } catch (e) {
+    console.error("addXP error:", e);
+    alert("修為更新失敗");
   }
+}
 
   async function addCoin(id, v) {
     await patchStudent(id, { coin: increment(v) });

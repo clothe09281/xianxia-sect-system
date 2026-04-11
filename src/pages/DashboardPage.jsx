@@ -808,7 +808,7 @@ async function importAchievementsToFirestore() {
     });
 
     await batch.commit();
-    alert(`匯入完成 ✅ 共 ${csvRows.length} 筆成就已寫入 achievements`);
+    alert(`匯入完成 ✅ 共 ${csvRows.length} 筆成就已寫入 `);
     setOpenImportAch(false);
     setCsvRows([]);
   } catch (e) {
@@ -1385,7 +1385,7 @@ function getStudentDisplayPower(s) {
         {!targetStudentId ? (
           <div style={{ opacity: 0.9 }}>請先在弟子列表點「🎁 發稱號」指定目標弟子。</div>
         ) : achievementsSorted.length === 0 ? (
-          <div style={{ opacity: 0.9 }}>目前 achievements 尚無資料（請先匯入/建立）。</div>
+          <div style={{ opacity: 0.9 }}>目前 成就系統 尚無資料（請先匯入/建立）。</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -1440,7 +1440,7 @@ function getStudentDisplayPower(s) {
       {/* ===================== 匯入成就彈窗 ===================== */}
       <Modal
   open={openImportAch}
-  title="📥 一鍵匯入 achievements（CSV）"
+  title="📥 一鍵匯入 成就系統（CSV）"
   onClose={() => {
     if (!importing) {
       setOpenImportAch(false);
@@ -1452,8 +1452,9 @@ function getStudentDisplayPower(s) {
 >
   <div style={{ opacity: 0.9, lineHeight: 1.7 }}>
     1) 請先把 Excel 另存成「CSV UTF-8」<br />
-    2) 上傳 CSV 後會預覽筆數<br />
-    3) 按「一鍵匯入」會全部寫入 Firestore 的 achievements
+    2) 上傳 資料 後會預覽筆數<br />
+    3) 按「一鍵匯入」
+    4) 完成
   </div>
 
   <div style={{ height: 12 }} />

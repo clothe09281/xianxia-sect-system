@@ -1453,7 +1453,7 @@ function getStudentDisplayPower(s) {
   <div style={{ opacity: 0.9, lineHeight: 1.7 }}>
     1) 請先把 Excel 另存成「CSV UTF-8」<br />
     2) 上傳 資料 後會預覽筆數<br />
-    3) 按「一鍵匯入」
+    3) 按「一鍵匯入」<br />
     4) 完成
   </div>
 

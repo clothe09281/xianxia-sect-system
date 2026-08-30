@@ -892,24 +892,44 @@ function getStudentDisplayPower(s) {
 // ===============================
   // 老師模式：手動增加妖丹
   // =============================== 
-  async function handleAddCoin(studentId) {
+  function askCoinAmount() {
     const input = window.prompt("請輸入要增加的妖丹數量：");
 
-    if (input === null) return;
+    if (input === null) return null;
 
     const amount = Number(input);
 
-    if (!Number.isFinite(amount)) {
-      alert("請輸入有效數字");
-      return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("請輸入大於 0 的有效數字");
+      return null;
     }
 
-    if (amount <= 0) {
-      alert("妖丹數量必須大於 0");
-      return;
-    }
+    return amount;
+  }
+  
+  async function handleAddCoin(studentId) {
+    const amount = askCoinAmount();
+
+    if (amount === null) return;
 
     await addCoin(studentId, amount);
+  }
+
+  async function addCoinToSelectedStudents() {
+    if (selectedStudentIds.size === 0) {
+      alert("請先選擇學生");
+      return;
+    }
+
+    const amount = askCoinAmount();
+
+    if (amount === null) return;
+
+    await Promise.all(
+      [...selectedStudentIds].map((id) =>
+        addCoin(id, amount)
+      )
+    );
   }
 
   // 單一學生勾選 / 取消
@@ -990,6 +1010,7 @@ function getStudentDisplayPower(s) {
         <button className="rpg-btn sm" onClick={addStudent}>新增弟子</button>
         <button className="rpg-btn sm" onClick={healAllStudentsFull}>🔥 全班滿血</button>
         <button className="rpg-btn sm" onClick={() => addXPToSelectedStudents(10)}>✅ 答對</button>
+        <button className="rpg-btn sm" onClick={addCoinToSelectedStudents}>妖丹</button>
       </div>
 
       {/* 主畫面 table */}

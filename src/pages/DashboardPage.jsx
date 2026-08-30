@@ -168,6 +168,8 @@ const [csvRows, setCsvRows] = useState([]);
 const [csvError, setCsvError] = useState("");
 const [importing, setImporting] = useState(false);
 
+const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+
   // ✅ 登入狀態 + 抓 classId
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -887,6 +889,95 @@ function getStudentDisplayPower(s) {
   return Number(s?.finalPower ?? fallbackPower);
 }
 
+// ===============================
+  // 老師模式：手動增加妖丹
+  // =============================== 
+  function askCoinAmount() {
+    const input = window.prompt("請輸入要增加的妖丹數量：");
+
+    if (input === null) return null;
+
+    const amount = Number(input);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("請輸入大於 0 的有效數字");
+      return null;
+    }
+
+    return amount;
+  }
+  
+  async function handleAddCoin(studentId) {
+    const amount = askCoinAmount();
+
+    if (amount === null) return;
+
+    await addCoin(studentId, amount);
+  }
+
+  async function addCoinToSelectedStudents() {
+    if (selectedStudentIds.size === 0) {
+      alert("請先選擇學生");
+      return;
+    }
+
+    const amount = askCoinAmount();
+
+    if (amount === null) return;
+
+    await Promise.all(
+      [...selectedStudentIds].map((id) =>
+        addCoin(id, amount)
+      )
+    );
+  }
+
+  // 單一學生勾選 / 取消
+  function toggleStudentSelection(id) {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }
+
+  // 全選 / 全取消
+  function toggleSelectAllStudents() {
+    const allSelected =
+      sortedStudents.length > 0 &&
+      sortedStudents.every((s) => selectedStudentIds.has(s.id));
+
+    if (allSelected) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(
+        new Set(sortedStudents.map((s) => s.id))
+      );
+    }
+  }
+
+  async function addXPToSelectedStudents(v) {
+    if (selectedStudentIds.size === 0) {
+      alert("請先選擇學生");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        [...selectedStudentIds].map((id) => addXP(id, v))
+      );
+    } catch (e) {
+      console.error("多人修為更新失敗:", e);
+      alert("部分學生修為更新失敗");
+    }
+  }
+
   return (
     <div style={{ width: "min(1400px, 96vw)", margin: "40px auto", fontFamily: "sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
@@ -918,12 +1009,26 @@ function getStudentDisplayPower(s) {
         />
         <button className="rpg-btn sm" onClick={addStudent}>新增弟子</button>
         <button className="rpg-btn sm" onClick={healAllStudentsFull}>🔥 全班滿血</button>
+        <button className="rpg-btn sm" onClick={() => addXPToSelectedStudents(10)}>✅ 答對</button>
+        <button className="rpg-btn sm" onClick={addCoinToSelectedStudents}>妖丹</button>
       </div>
 
       {/* 主畫面 table */}
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ background: "#111", color: "#fff" }}>
+            <th style={{ padding: 10 }}>
+              <input
+                type="checkbox"
+                checked={
+                  sortedStudents.length > 0 &&
+                  sortedStudents.every((s) =>
+                    selectedStudentIds.has(s.id)
+                  )
+                }
+                onChange={toggleSelectAllStudents}
+              />
+            </th>
             <th style={{ padding: 10, textAlign: "left" }}>弟子</th>
             <th>等級</th>
             <th>血量</th>
@@ -936,6 +1041,13 @@ function getStudentDisplayPower(s) {
         <tbody>
           {sortedStudents.map((s) => (
             <tr key={s.id} style={{ borderBottom: "1px solid #ddd" }}>
+              <td align="center">
+                <input
+                  type="checkbox"
+                  checked={selectedStudentIds.has(s.id)}
+                  onChange={() => toggleStudentSelection(s.id)}
+                />
+              </td>
               <td style={{ padding: 10 }}>
               <div style={{
                fontSize: 20,
@@ -970,7 +1082,7 @@ function getStudentDisplayPower(s) {
               <td align="center">
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, 10)}>✅ 答對</button>{" "}
                 <button className="rpg-btn sm" onClick={() => addXP(s.id, -5)}>❌ 答錯</button>{" "}
-                <button className="rpg-btn sm" onClick={() => addCoin(s.id, 10)}>妖丹</button>{" "}
+                <button className="rpg-btn sm" onClick={() => handleAddCoin(s.id)}>妖丹</button>{" "}
                 <button className="rpg-btn sm" onClick={() => healStudentFull(s.id)}>回血</button>{" "}
                 <button
                   className="rpg-btn sm"

@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import {
   doc,
@@ -141,7 +142,8 @@ export default function StudentLoginPage() {
         setTab("claim");
       }
     } catch (e) {
-      setMsg(e?.message || "登入失敗");
+      console.error(e);
+      setMsg("登入失敗，請確認 Email 與密碼是否正確。");
     } finally {
       setBusy(false);
     }
@@ -179,6 +181,29 @@ export default function StudentLoginPage() {
       setMsg(e?.message || "註冊/認領失敗");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setMsg("");
+
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) {
+      setMsg("請先輸入註冊時使用的 Email。");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, normalizedEmail);
+
+      setMsg("密碼重設信已寄出，請至信箱查看。");
+    } catch (e) {
+      console.error(e);
+
+      setMsg(
+        "若此 Email 已註冊，我們會寄送密碼重設信，請至信箱查看。"
+      );
     }
   }
 
@@ -265,9 +290,26 @@ export default function StudentLoginPage() {
       {msg && <div style={{ color: msg.includes("✅") ? "green" : "crimson", marginBottom: 10 }}>{msg}</div>}
 
       {tab === "login" ? (
-        <button className="rpg-btn" onClick={handleLogin} disabled={busy}>
-          {busy ? "登入中..." : "登入"}
-        </button>
+        <>
+          <button className="rpg-btn" onClick={handleLogin} disabled={busy}>
+            {busy ? "登入中..." : "登入"}
+          </button>
+
+          <button
+            type="button" onClick={handleForgotPassword} disabled={busy} style={{
+              display: "block",
+              marginTop: 12,
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              color: "#555",
+              textDecoration: "underline",
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            忘記密碼？
+          </button>
+        </>
       ) : (
         <button className="rpg-btn" onClick={handleRegisterAndClaim} disabled={busy}>
           {busy ? "處理中..." : "註冊並認領弟子"}

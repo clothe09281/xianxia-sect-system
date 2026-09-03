@@ -4,6 +4,7 @@ import { auth, db } from "../firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import {
   doc,
@@ -82,7 +83,8 @@ export default function LoginPage() {
 
       navigate("/dashboard");
     } catch (e) {
-      setMsg(e.message);
+      console.error(e);
+      setMsg("登入失敗，請確認 Email 與密碼是否正確。");
     }
   }
 
@@ -96,7 +98,37 @@ export default function LoginPage() {
 
       navigate("/dashboard");
     } catch (e) {
-      setMsg(e.message);
+      console.error(e);
+
+      if (e.code === "auth/email-already-in-use") {
+        setMsg("此 Email 已經註冊，請直接登入或使用忘記密碼。");
+      } else if (e.code === "auth/weak-password") {
+        setMsg("密碼至少需要 6 碼。");
+      } else if (e.code === "auth/invalid-email") {
+        setMsg("Email 格式不正確。");
+      } else {
+        setMsg("註冊失敗，請稍後再試。");
+      }
+    }
+  }
+
+  async function handleForgotPassword() {
+    setMsg("");
+
+    if (!email.trim()) {
+      setMsg("請先輸入註冊時使用的 Email。");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+
+      setMsg("密碼重設信已寄出，請至信箱查看。");
+    } catch (e) {
+      console.error(e);
+
+      // 不直接透露帳號是否存在
+      setMsg("若此 Email 已註冊，我們會寄送密碼重設信，請至信箱查看。");
     }
   }
 
@@ -147,6 +179,22 @@ export default function LoginPage() {
           註冊
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={handleForgotPassword}
+        style={{
+          marginTop: 12,
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          color: "#555",
+          textDecoration: "underline",
+          cursor: "pointer",
+        }}
+      >
+        忘記密碼？
+      </button>
 
       {msg && <p style={{ marginTop: 14, color: "crimson" }}>{msg}</p>}
     </div>

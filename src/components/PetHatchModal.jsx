@@ -246,29 +246,38 @@ export default function PetHatchModal({
         const master = PETS_MASTER[pet.id];
         if (!master) throw new Error("找不到靈寵主資料");
 
+        const studentPatch = {
+          currentPetId: master.id,
+          currentPetName: master.name,
+          currentPetIcon: master.icon,
+          petHatchedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
         if (petSnap.exists()) {
           const oldPetShard = Number(studentData.petShard || 0);
+          const existingPetData = petSnap.data() || {};
 
-          tx.update(studentRef, {
-            petShard: oldPetShard + 1,
+          studentPatch.petShard = oldPetShard + 1;
+          studentPatch.currentPetPower = calcPetPower(existingPetData);
+
+          tx.update(petRef, {
+            equipped: true,
             updatedAt: serverTimestamp(),
           });
         } else {
+          const newPetData = createPetDoc(master);
+          studentPatch.currentPetPower = calcPetPower(newPetData);
+
           tx.set(petRef, {
-            ...createPetDoc(master),
+            ...newPetData,
             equipped: true,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
         }
 
-        tx.update(studentRef, {
-          currentPetId: master.id,
-          currentPetName: master.name,
-          currentPetIcon: master.icon,
-          petHatchedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+        tx.update(studentRef, studentPatch);
 
         tx.update(eggRef, {
           qty: 0,
@@ -333,8 +342,8 @@ export default function PetHatchModal({
 
     const { classId, studentId } = studentPath;
     const petRef = doc(db, "classes", classId, "students", studentId, "pets", pet.petId);
-const foodRef = doc(db, "classes", classId, "students", studentId, "inventory", foodToConsumeId);
-const studentRef = doc(db, "classes", classId, "students", studentId);
+    const foodRef = doc(db, "classes", classId, "students", studentId, "inventory", foodToConsumeId);
+    const studentRef = doc(db, "classes", classId, "students", studentId);
 
     try {
       await runTransaction(db, async (tx) => {
@@ -372,19 +381,19 @@ const studentRef = doc(db, "classes", classId, "students", studentId);
         });
 
         if (student?.currentPetId === pet.petId) {
-  const nextPetPower = calcPetPower({
-    ...petData,
-    level: newLevel,
-    hp: newStats.hp,
-    atk: newStats.atk,
-    spd: newStats.spd,
-  });
+          const nextPetPower = calcPetPower({
+            ...petData,
+            level: newLevel,
+            hp: newStats.hp,
+            atk: newStats.atk,
+            spd: newStats.spd,
+          });
 
-  tx.update(studentRef, {
-    currentPetPower: nextPetPower,
-    updatedAt: serverTimestamp(),
-  });
-}
+          tx.update(studentRef, {
+            currentPetPower: nextPetPower,
+            updatedAt: serverTimestamp(),
+          });
+        }
 
       });
 
@@ -453,20 +462,20 @@ const studentRef = doc(db, "classes", classId, "students", studentId);
         });
 
         if (student?.currentPetId === pet.petId) {
-  const nextPetPower = calcPetPower({
-    ...petData,
-    star: newStar,
-    level: newLevel,
-    hp: newStats.hp,
-    atk: newStats.atk,
-    spd: newStats.spd,
-  });
+          const nextPetPower = calcPetPower({
+            ...petData,
+            star: newStar,
+            level: newLevel,
+            hp: newStats.hp,
+            atk: newStats.atk,
+            spd: newStats.spd,
+          });
 
-  tx.update(studentRef, {
-    currentPetPower: nextPetPower,
-    updatedAt: serverTimestamp(),
-  });
-}
+          tx.update(studentRef, {
+            currentPetPower: nextPetPower,
+            updatedAt: serverTimestamp(),
+          });
+        }
 
       });
 

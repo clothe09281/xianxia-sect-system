@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-import { calcWeaponPower, calcWeaponXpBonus } from "../data/weapons";
+import { calcFinalWeaponPower } from "../data/weapons";
 
 /** ✅ 通用 Modal */
 function Modal({ open, title, onClose, children, width = 980 }) {
@@ -126,7 +126,7 @@ const ITEM_DESCRIPTIONS = {
       "用於神兵精煉與特效洗練",
     ],
   },
-    // 🎴 特權卡
+  // 🎴 特權卡
   card_001: {
     color: "#ffd59e",
     lines: [
@@ -251,16 +251,11 @@ export default function BackpackModal({
   const selectedItemDesc = selectedItem ? ITEM_DESCRIPTIONS[selectedItem.id] : null;
 
   function sumEquippedWeaponPower(equippedWeapons = []) {
-  return equippedWeapons.reduce((sum, w) => {
-    return sum + Number(w?.power || 0);
-  }, 0);
-}
+    return equippedWeapons.reduce((sum, w) => {
+      return sum + Number(w?.power || 0);
+    }, 0);
+  }
 
-function sumEquippedWeaponXpBonus(equippedWeapons = []) {
-  return equippedWeapons.reduce((sum, w) => {
-    return sum + Number(w?.xpBonus || 0);
-  }, 0);
-}
 
   const tabItems = useMemo(() => {
     const arr = Array.isArray(items) ? items : [];
@@ -274,206 +269,201 @@ function sumEquippedWeaponXpBonus(equippedWeapons = []) {
   }, [tabItems, slotsPerTab]);
 
   async function equipWeapon(item) {
-  if (!studentPath?.classId || !studentPath?.studentId) return alert("尚未取得 studentPath");
-  if (!student) return alert("尚未取得學生資料");
+    if (!studentPath?.classId || !studentPath?.studentId) return alert("尚未取得 studentPath");
+    if (!student) return alert("尚未取得學生資料");
 
-  const myLv = Number(student.level || 1);
-  const needLv = Number(item.requiredLevel || 1);
+    const myLv = Number(student.level || 1);
+    const needLv = Number(item.requiredLevel || 1);
 
-  if (myLv < 20) {
-    return alert("需達 Lv20 才能開啟神兵系統");
-  }
+    if (myLv < 20) {
+      return alert("需達 Lv20 才能開啟神兵系統");
+    }
 
-  if (myLv < needLv) {
-    return alert(`此神兵需弟子 Lv.${needLv} 才能裝備`);
-  }
+    if (myLv < needLv) {
+      return alert(`此神兵需弟子 Lv.${needLv} 才能裝備`);
+    }
 
-  const classId = studentPath.classId;
-  const studentId = studentPath.studentId;
+    const classId = studentPath.classId;
+    const studentId = studentPath.studentId;
 
-  const studentRef = doc(db, "classes", classId, "students", studentId);
-  const weaponRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
+    const studentRef = doc(db, "classes", classId, "students", studentId);
+    const weaponRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
 
-  try {
-    await runTransaction(db, async (tx) => {
-      const sSnap = await tx.get(studentRef);
-      const wSnap = await tx.get(weaponRef);
+    try {
+      await runTransaction(db, async (tx) => {
+        const sSnap = await tx.get(studentRef);
+        const wSnap = await tx.get(weaponRef);
 
-      if (!sSnap.exists()) throw new Error("找不到學生資料");
-      if (!wSnap.exists()) throw new Error("找不到神兵資料");
+        if (!sSnap.exists()) throw new Error("找不到學生資料");
+        if (!wSnap.exists()) throw new Error("找不到神兵資料");
 
-      const sData = sSnap.data() || {};
-      const weaponData = wSnap.data() || {};
+        const sData = sSnap.data() || {};
+        const weaponData = wSnap.data() || {};
 
-      const equippedWeapons = Array.isArray(sData.equippedWeapons)
-        ? [...sData.equippedWeapons]
-        : [];
+        const equippedWeapons = Array.isArray(sData.equippedWeapons)
+          ? [...sData.equippedWeapons]
+          : [];
 
-      // 已經裝過同一把，不重複裝
-      const alreadyEquipped = equippedWeapons.some((w) => w.weaponId === item.id);
-      if (alreadyEquipped) {
-        throw new Error("此神兵已裝備");
-      }
+        // 已經裝過同一把，不重複裝
+        const alreadyEquipped = equippedWeapons.some((w) => w.weaponId === item.id);
+        if (alreadyEquipped) {
+          throw new Error("此神兵已裝備");
+        }
 
-      // 最多 3 把
-      if (equippedWeapons.length >= 3) {
-        throw new Error("最多只能裝備 3 把神兵，請先卸下其他神兵");
-      }
+        // 最多 3 把
+        if (equippedWeapons.length >= 3) {
+          throw new Error("最多只能裝備 3 把神兵，請先卸下其他神兵");
+        }
 
-      const nextWeaponEntry = {
-        weaponId: item.id,
-        name: item.name || "",
-        icon: item.icon || "",
-        power: calcWeaponPower(weaponData),
-        xpBonus: calcWeaponXpBonus(weaponData),
-      };
+        const nextWeaponEntry = {
+          weaponId: item.id,
+          name: item.name || "",
+          icon: item.icon || "",
+          power: calcFinalWeaponPower(weaponData),
+        };
 
-      const nextEquippedWeapons = [...equippedWeapons, nextWeaponEntry];
+        const nextEquippedWeapons = [...equippedWeapons, nextWeaponEntry];
 
-      const totalWeaponPower = sumEquippedWeaponPower(nextEquippedWeapons);
-      const totalWeaponXpBonus = sumEquippedWeaponXpBonus(nextEquippedWeapons);
+        const totalWeaponPower = sumEquippedWeaponPower(nextEquippedWeapons);
 
-      tx.update(studentRef, {
-        weaponSystemUnlocked: true,
-        weaponSystemUnlockedAt: sData.weaponSystemUnlockedAt || serverTimestamp(),
-        equippedWeapons: nextEquippedWeapons,
-        currentWeaponId: nextEquippedWeapons[0]?.weaponId || "",
-        currentWeaponName: nextEquippedWeapons.map((w) => w.name).join("、"),
-        currentWeaponIcon: nextEquippedWeapons[0]?.icon || "",
-        currentWeaponPower: totalWeaponPower,
-        currentWeaponXpBonus: totalWeaponXpBonus,
-        updatedAt: serverTimestamp(),
-      });
-
-      tx.update(weaponRef, {
-        equipped: true,
-        updatedAt: serverTimestamp(),
-      });
-    });
-
-    alert(`✅ 已裝備神兵：${item.name}`);
-    setSelectedItem(null);
-  } catch (e) {
-    console.error("equipWeapon error:", e);
-    alert(e?.message || "裝備失敗");
-  }
-}
-
-async function unequipWeapon(item) {
-  if (!studentPath?.classId || !studentPath?.studentId) {
-    return alert("尚未取得 studentPath");
-  }
-  if (!student) return alert("尚未取得學生資料");
-
-  const classId = studentPath.classId;
-  const studentId = studentPath.studentId;
-
-  const studentRef = doc(db, "classes", classId, "students", studentId);
-  const weaponRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
-
-  try {
-    await runTransaction(db, async (tx) => {
-      const sSnap = await tx.get(studentRef);
-      const wSnap = await tx.get(weaponRef);
-
-      if (!sSnap.exists()) throw new Error("找不到學生資料");
-      if (!wSnap.exists()) throw new Error("找不到神兵資料");
-
-      const sData = sSnap.data() || {};
-      const weaponData = wSnap.data() || {};
-
-      if (!weaponData.equipped) {
-        throw new Error("此神兵目前未裝備");
-      }
-
-      const equippedWeapons = Array.isArray(sData.equippedWeapons)
-        ? [...sData.equippedWeapons]
-        : [];
-
-      const nextEquippedWeapons = equippedWeapons.filter((w) => w.weaponId !== item.id);
-
-      const totalWeaponPower = sumEquippedWeaponPower(nextEquippedWeapons);
-      const totalWeaponXpBonus = sumEquippedWeaponXpBonus(nextEquippedWeapons);
-
-      // 1) 神兵本體改為未裝備
-      tx.update(weaponRef, {
-        equipped: false,
-        updatedAt: serverTimestamp(),
-      });
-
-      // 2) 更新學生主檔的神兵摘要
-      tx.update(studentRef, {
-        equippedWeapons: nextEquippedWeapons,
-        currentWeaponId: nextEquippedWeapons[0]?.weaponId || "",
-        currentWeaponName: nextEquippedWeapons.map((w) => w.name).join("、"),
-        currentWeaponIcon: nextEquippedWeapons[0]?.icon || "",
-        currentWeaponPower: totalWeaponPower,
-        currentWeaponXpBonus: totalWeaponXpBonus,
-        updatedAt: serverTimestamp(),
-      });
-    });
-
-    alert(`✅ 已卸下神兵：${item.name}`);
-    setSelectedItem(null);
-  } catch (e) {
-    console.error("unequipWeapon error:", e);
-    alert(e?.message || "卸下失敗");
-  }
-}
-
-async function useCardItem(item) {
-  if (!studentPath?.classId || !studentPath?.studentId) {
-    alert("尚未取得 studentPath");
-    return;
-  }
-
-  if (!item?.id) {
-    alert("找不到道具資料");
-    return;
-  }
-
-  const classId = studentPath.classId;
-  const studentId = studentPath.studentId;
-
-  const itemRef = doc(
-    db,
-    "classes",
-    classId,
-    "students",
-    studentId,
-    "inventory",
-    item.id
-  );
-
-  try {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(itemRef);
-      if (!snap.exists()) throw new Error("找不到此道具");
-
-      const data = snap.data() || {};
-      const qtyNow = Number(data.qty || 0);
-
-      if (qtyNow <= 0) throw new Error("此道具數量不足");
-
-      // ✅ 只有 1 張：直接刪除
-      if (qtyNow === 1) {
-        tx.delete(itemRef);
-      } else {
-        // ✅ 多於 1 張：數量 -1
-        tx.update(itemRef, {
-          qty: qtyNow - 1,
+        tx.update(studentRef, {
+          weaponSystemUnlocked: true,
+          weaponSystemUnlockedAt: sData.weaponSystemUnlockedAt || serverTimestamp(),
+          equippedWeapons: nextEquippedWeapons,
+          currentWeaponId: nextEquippedWeapons[0]?.weaponId || "",
+          currentWeaponName: nextEquippedWeapons.map((w) => w.name).join("、"),
+          currentWeaponIcon: nextEquippedWeapons[0]?.icon || "",
+          currentWeaponPower: totalWeaponPower,
           updatedAt: serverTimestamp(),
         });
-      }
-    });
 
-    alert(`✅ 已使用特權卡：${item.name}`);
-    setSelectedItem(null);
-  } catch (e) {
-    console.error("useCardItem error:", e);
-    alert(e?.message || "使用失敗");
+        tx.update(weaponRef, {
+          equipped: true,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      alert(`✅ 已裝備神兵：${item.name}`);
+      setSelectedItem(null);
+    } catch (e) {
+      console.error("equipWeapon error:", e);
+      alert(e?.message || "裝備失敗");
+    }
   }
-}
+
+  async function unequipWeapon(item) {
+    if (!studentPath?.classId || !studentPath?.studentId) {
+      return alert("尚未取得 studentPath");
+    }
+    if (!student) return alert("尚未取得學生資料");
+
+    const classId = studentPath.classId;
+    const studentId = studentPath.studentId;
+
+    const studentRef = doc(db, "classes", classId, "students", studentId);
+    const weaponRef = doc(db, "classes", classId, "students", studentId, "inventory", item.id);
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const sSnap = await tx.get(studentRef);
+        const wSnap = await tx.get(weaponRef);
+
+        if (!sSnap.exists()) throw new Error("找不到學生資料");
+        if (!wSnap.exists()) throw new Error("找不到神兵資料");
+
+        const sData = sSnap.data() || {};
+        const weaponData = wSnap.data() || {};
+
+        if (!weaponData.equipped) {
+          throw new Error("此神兵目前未裝備");
+        }
+
+        const equippedWeapons = Array.isArray(sData.equippedWeapons)
+          ? [...sData.equippedWeapons]
+          : [];
+
+        const nextEquippedWeapons = equippedWeapons.filter((w) => w.weaponId !== item.id);
+
+        const totalWeaponPower = sumEquippedWeaponPower(nextEquippedWeapons);
+
+        // 1) 神兵本體改為未裝備
+        tx.update(weaponRef, {
+          equipped: false,
+          updatedAt: serverTimestamp(),
+        });
+
+        // 2) 更新學生主檔的神兵摘要
+        tx.update(studentRef, {
+          equippedWeapons: nextEquippedWeapons,
+          currentWeaponId: nextEquippedWeapons[0]?.weaponId || "",
+          currentWeaponName: nextEquippedWeapons.map((w) => w.name).join("、"),
+          currentWeaponIcon: nextEquippedWeapons[0]?.icon || "",
+          currentWeaponPower: totalWeaponPower,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      alert(`✅ 已卸下神兵：${item.name}`);
+      setSelectedItem(null);
+    } catch (e) {
+      console.error("unequipWeapon error:", e);
+      alert(e?.message || "卸下失敗");
+    }
+  }
+
+  async function useCardItem(item) {
+    if (!studentPath?.classId || !studentPath?.studentId) {
+      alert("尚未取得 studentPath");
+      return;
+    }
+
+    if (!item?.id) {
+      alert("找不到道具資料");
+      return;
+    }
+
+    const classId = studentPath.classId;
+    const studentId = studentPath.studentId;
+
+    const itemRef = doc(
+      db,
+      "classes",
+      classId,
+      "students",
+      studentId,
+      "inventory",
+      item.id
+    );
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(itemRef);
+        if (!snap.exists()) throw new Error("找不到此道具");
+
+        const data = snap.data() || {};
+        const qtyNow = Number(data.qty || 0);
+
+        if (qtyNow <= 0) throw new Error("此道具數量不足");
+
+        // ✅ 只有 1 張：直接刪除
+        if (qtyNow === 1) {
+          tx.delete(itemRef);
+        } else {
+          // ✅ 多於 1 張：數量 -1
+          tx.update(itemRef, {
+            qty: qtyNow - 1,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+
+      alert(`✅ 已使用特權卡：${item.name}`);
+      setSelectedItem(null);
+    } catch (e) {
+      console.error("useCardItem error:", e);
+      alert(e?.message || "使用失敗");
+    }
+  }
 
   return (
     <Modal open={open} onClose={onClose} title="🎒 行囊（背包）" width={width}>
@@ -506,24 +496,24 @@ async function useCardItem(item) {
 
           return (
             <div
-  key={it?.id ? it.id : `empty-${idx}`}
-  onClick={() => {
-    if (it) setSelectedItem(it);
-  }}
-  style={{
-    height: 86,
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.04)",
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    cursor: it ? "pointer" : "default",
-  }}
-  title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
->
+              key={it?.id ? it.id : `empty-${idx}`}
+              onClick={() => {
+                if (it) setSelectedItem(it);
+              }}
+              style={{
+                height: 86,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.04)",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                cursor: it ? "pointer" : "default",
+              }}
+              title={it ? `${it.name} x${it.qty ?? 1}` : "空格"}
+            >
               {!it ? (
                 <div style={{ opacity: 0.2, fontSize: 12 }}>空</div>
               ) : (
@@ -547,18 +537,18 @@ async function useCardItem(item) {
                   )}
 
                   <div
-  style={{
-    position: "absolute",
-    right: 8,
-    bottom: 6,
-    fontSize: 12,
-    fontWeight: 900,
-    color: "#ffcc66",
-    textShadow: "0 2px 6px rgba(0,0,0,0.6)",
-  }}
->
-  {it?.category === "weapon" && it?.equipped ? "已裝備" : `x${it?.qty ?? 1}`}
-</div>
+                    style={{
+                      position: "absolute",
+                      right: 8,
+                      bottom: 6,
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: "#ffcc66",
+                      textShadow: "0 2px 6px rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {it?.category === "weapon" && it?.equipped ? "已裝備" : `x${it?.qty ?? 1}`}
+                  </div>
 
                   {/* ✅ 靈獸蛋可使用 */}
                   {it.id === "egg_001" && !it.activated && typeof onUseItem === "function" && (
@@ -592,199 +582,198 @@ async function useCardItem(item) {
       </div>
 
       {/* ===================== 道具詳情視窗 ===================== */}
-<Modal
-  open={!!selectedItem}
-  onClose={() => setSelectedItem(null)}
-  title={selectedItem ? `物品詳情｜${selectedItem.name}` : "物品詳情"}
-  width={560}
->
-  {!selectedItem ? null : selectedItem.category === "weapon" ? (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 16, alignItems: "center" }}>
-        <div
-          style={{
-            width: 110,
-            height: 110,
-            borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.14)",
-            background: "rgba(255,255,255,0.06)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}
-        >
-          <img
-            src={selectedItem.icon}
-            alt={selectedItem.name}
-            style={{ width: "82%", height: "82%", objectFit: "contain" }}
-          />
-        </div>
-
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedItem.name}</div>
-          <div style={{ marginTop: 6, opacity: 0.8 }}>
-            等級需求：Lv.{Number(selectedItem.requiredLevel || 1)}
-          </div>
-          <div style={{ marginTop: 6, opacity: 0.8 }}>
-            狀態：{selectedItem.equipped ? "已裝備" : "未裝備"}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ height: 16 }} />
-
-      <div
-  style={{
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.05)",
-    padding: 12,
-    lineHeight: 1.9,
-  }}
->
-  <div><b>❤️ 基礎血量：</b>{Number(selectedItem.baseHp || 0)}</div>
-  <div><b>⚔️ 基礎攻擊：</b>{Number(selectedItem.baseAtk || 0)}</div>
-  <div><b>💨 基礎速度：</b>{Number(selectedItem.baseSpd || 0)}</div>
-  <div><b>✨ 神兵戰力：</b>{calcWeaponPower(selectedItem)}</div>
-  <div><b>📘 修為加成：</b>{calcWeaponXpBonus(selectedItem)}</div>
-</div>
-
-      <div style={{ height: 14 }} />
-
-      <div
-        style={{
-          borderRadius: 12,
-          background: "rgba(255,255,255,0.05)",
-          padding: 12,
-        }}
+      <Modal
+        open={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        title={selectedItem ? `物品詳情｜${selectedItem.name}` : "物品詳情"}
+        width={560}
       >
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>
-          技能：{selectedItem.skillName || "未命名技能"}
-        </div>
-        <div style={{ opacity: 0.85, lineHeight: 1.7 }}>
-          {selectedItem.skillDesc || "尚無技能說明"}
-        </div>
-      </div>
+        {!selectedItem ? null : selectedItem.category === "weapon" ? (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 16, alignItems: "center" }}>
+              <div
+                style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(255,255,255,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={selectedItem.icon}
+                  alt={selectedItem.name}
+                  style={{ width: "82%", height: "82%", objectFit: "contain" }}
+                />
+              </div>
 
-      <div style={{ height: 18 }} />
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedItem.name}</div>
+                <div style={{ marginTop: 6, opacity: 0.8 }}>
+                  等級需求：Lv.{Number(selectedItem.requiredLevel || 1)}
+                </div>
+                <div style={{ marginTop: 6, opacity: 0.8 }}>
+                  狀態：{selectedItem.equipped ? "已裝備" : "未裝備"}
+                </div>
+              </div>
+            </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <button
-  className="rpg-btn"
-  onClick={() => {
-    if (selectedItem.equipped) {
-      unequipWeapon(selectedItem);
-    } else {
-      equipWeapon(selectedItem);
-    }
-  }}
-  disabled={
-    !selectedItem.equipped &&
-    (
-      Number(student?.level || 1) < 20 ||
-      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
-    )
-  }
-  style={{
-    opacity:
-      !selectedItem.equipped &&
-      (
-        Number(student?.level || 1) < 20 ||
-        Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-        (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
-      )
-        ? 0.5
-        : 1,
-    cursor:
-      !selectedItem.equipped &&
-      (
-        Number(student?.level || 1) < 20 ||
-        Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
-        (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
-      )
-        ? "not-allowed"
-        : "pointer",
-  }}
->
-  {selectedItem.equipped ? "卸下" : "⚔️ 裝備"}
-</button>
-      </div>
-    </div>
-  ) : (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 16, alignItems: "center" }}>
-        <div
-          style={{
-            width: 110,
-            height: 110,
-            borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.14)",
-            background: "rgba(255,255,255,0.06)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}
-        >
-          <img
-            src={selectedItem.icon}
-            alt={selectedItem.name}
-            style={{ width: "82%", height: "82%", objectFit: "contain" }}
-          />
-        </div>
+            <div style={{ height: 16 }} />
 
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedItem.name}</div>
-          <div style={{ marginTop: 6, opacity: 0.9 }}>
-  {selectedItemDesc ? (
-    <div style={{ lineHeight: 1.6, color: selectedItemDesc.color || "#e8d9a3" }}>
-      {selectedItemDesc.lines.map((line, idx) => (
-        <div key={idx}>✦ {line}</div>
-      ))}
-    </div>
-  ) : (
-    <div style={{ opacity: 0.7 }}>
-      類型：{selectedItem?.category}
-    </div>
-  )}
-</div>
-          <div style={{ marginTop: 6, opacity: 0.8 }}>
-            數量：x{Number(selectedItem.qty || 1)}
+            <div
+              style={{
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.05)",
+                padding: 12,
+                lineHeight: 1.9,
+              }}
+            >
+              <div><b>❤️ 基礎血量：</b>{Number(selectedItem.baseHp || 0)}</div>
+              <div><b>⚔️ 基礎攻擊：</b>{Number(selectedItem.baseAtk || 0)}</div>
+              <div><b>💨 基礎速度：</b>{Number(selectedItem.baseSpd || 0)}</div>
+              <div><b>✨ 神兵戰力：</b>{calcFinalWeaponPower(selectedItem)}</div>
+            </div>
+
+            <div style={{ height: 14 }} />
+
+            <div
+              style={{
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.05)",
+                padding: 12,
+              }}
+            >
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                技能：{selectedItem.skillName || "未命名技能"}
+              </div>
+              <div style={{ opacity: 0.85, lineHeight: 1.7 }}>
+                {selectedItem.skillDesc || "尚無技能說明"}
+              </div>
+            </div>
+
+            <div style={{ height: 18 }} />
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                className="rpg-btn"
+                onClick={() => {
+                  if (selectedItem.equipped) {
+                    unequipWeapon(selectedItem);
+                  } else {
+                    equipWeapon(selectedItem);
+                  }
+                }}
+                disabled={
+                  !selectedItem.equipped &&
+                  (
+                    Number(student?.level || 1) < 20 ||
+                    Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+                    (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+                  )
+                }
+                style={{
+                  opacity:
+                    !selectedItem.equipped &&
+                    (
+                      Number(student?.level || 1) < 20 ||
+                      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+                      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+                    )
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    !selectedItem.equipped &&
+                    (
+                      Number(student?.level || 1) < 20 ||
+                      Number(student?.level || 1) < Number(selectedItem.requiredLevel || 1) ||
+                      (Array.isArray(student?.equippedWeapons) && student.equippedWeapons.length >= 3)
+                    )
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {selectedItem.equipped ? "卸下" : "⚔️ 裝備"}
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
+        ) : (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 16, alignItems: "center" }}>
+              <div
+                style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(255,255,255,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={selectedItem.icon}
+                  alt={selectedItem.name}
+                  style={{ width: "82%", height: "82%", objectFit: "contain" }}
+                />
+              </div>
 
-      <div style={{ height: 18 }} />
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedItem.name}</div>
+                <div style={{ marginTop: 6, opacity: 0.9 }}>
+                  {selectedItemDesc ? (
+                    <div style={{ lineHeight: 1.6, color: selectedItemDesc.color || "#e8d9a3" }}>
+                      {selectedItemDesc.lines.map((line, idx) => (
+                        <div key={idx}>✦ {line}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ opacity: 0.7 }}>
+                      類型：{selectedItem?.category}
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginTop: 6, opacity: 0.8 }}>
+                  數量：x{Number(selectedItem.qty || 1)}
+                </div>
+              </div>
+            </div>
 
-<div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <div style={{ height: 18 }} />
 
-  {/* 靈獸蛋 */}
-  {selectedItem.id === "egg_001" && (
-    <button
-      className="rpg-btn"
-      onClick={() => {
-        onUseItem?.(selectedItem);
-        setSelectedItem(null);
-      }}
-    >
-      使用
-    </button>
-  )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
 
-  {/* 特權卡 */}
-  {selectedItem.category === "card" && (
-    <button
-      className="rpg-btn"
-      onClick={() => useCardItem(selectedItem)}
-    >
-      使用
-    </button>
-  )}
-</div>
-    </div>
-  )}
-</Modal>
+              {/* 靈獸蛋 */}
+              {selectedItem.id === "egg_001" && (
+                <button
+                  className="rpg-btn"
+                  onClick={() => {
+                    onUseItem?.(selectedItem);
+                    setSelectedItem(null);
+                  }}
+                >
+                  使用
+                </button>
+              )}
+
+              {/* 特權卡 */}
+              {selectedItem.category === "card" && (
+                <button
+                  className="rpg-btn"
+                  onClick={() => useCardItem(selectedItem)}
+                >
+                  使用
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
     </Modal>
   );

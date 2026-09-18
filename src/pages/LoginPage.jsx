@@ -17,6 +17,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import PasswordInput from "../components/PasswordInput";
 
 // 產生班級代碼：6碼（大寫+數字）
 function genClassCode(len = 6) {
@@ -133,73 +134,68 @@ export default function LoginPage() {
   }
 
   return (
-      <div
-        style={{
-          minHeight: "100vh",
-          backgroundImage: 'url("/background.jpg")',
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          color: "#fff",
-          position: "relative",
-        }}
-      >
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundImage: 'url("/background.jpg")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        color: "#fff",
+        position: "relative",
+      }}
+    >
+      <div className="login-wrap">
+        <div className="login-card">
+          <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
+            <h2 style={{ marginBottom: 10 }}>師尊登入</h2>
+            <p style={{ color: "#555" }}>第一次使用請先註冊（密碼至少 6 碼）。</p>
 
-    <div className="login-wrap">
-    <div className="login-card">
-      <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
-      <h2 style={{ marginBottom: 10 }}>師尊登入</h2>
-      <p style={{ color: "#555" }}>第一次使用請先註冊（密碼至少 6 碼）。</p>
+            <label>Email</label>
+            <input
+              style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
 
-      <label>Email</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-      />
+            <PasswordInput
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+            />
 
-      <label>密碼</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-        value={pw}
-        onChange={(e) => setPw(e.target.value)}
-        placeholder="至少 6 碼"
-        type="password"
-      />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button style={{ padding: "10px 14px" }} onClick={handleLogin}>
+                登入
+              </button>
+              <button style={{ padding: "10px 14px" }} onClick={handleRegister}>
+                註冊
+              </button>
+            </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button style={{ padding: "10px 14px" }} onClick={handleLogin}>
-          登入
-        </button>
-        <button style={{ padding: "10px 14px" }} onClick={handleRegister}>
-          註冊
-        </button>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              style={{
+                marginTop: 12,
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                color: "#555",
+                textDecoration: "underline",
+                cursor: "pointer",
+              }}
+            >
+              忘記密碼？
+            </button>
+
+            {msg && <p style={{ marginTop: 14, color: "crimson" }}>{msg}</p>}
+          </div>
+        </div>
       </div>
-
-      <button
-        type="button"
-        onClick={handleForgotPassword}
-        style={{
-          marginTop: 12,
-          padding: 0,
-          border: "none",
-          background: "transparent",
-          color: "#555",
-          textDecoration: "underline",
-          cursor: "pointer",
-        }}
-      >
-        忘記密碼？
-      </button>
-
-      {msg && <p style={{ marginTop: 14, color: "crimson" }}>{msg}</p>}
-    </div>
-    </div>
-    </div>
     </div>
   );
 }

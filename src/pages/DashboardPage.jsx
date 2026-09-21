@@ -29,6 +29,9 @@ import {
   recordChallengeAnswer,
   completeChallengeSession
 } from "../services/challengeService";
+import{
+  seedDefaultMonsters
+}from "../services/monsterService";
 
 // 🏮 藏寶閣商品
 import TreasureShop from "../components/TreasureShop";
@@ -140,6 +143,7 @@ export default function DashboardPage() {
 
   // 歷練
   const [monsters, setMonsters] = useState([]);
+  const [monstersLoaded, setMonstersLoaded] = useState(false);
   const [selectedMonsterId, setSelectedMonsterId] = useState("");
 
   const [battle, setBattle] = useState(null);
@@ -257,19 +261,16 @@ export default function DashboardPage() {
           .filter((monster) => monster.isActive !== false);
 
         setMonsters(list);
+        setMonstersLoaded(true);
 
-        // 尚未選怪物時，預設選第一隻
         setSelectedMonsterId((current) => {
           if (current) return current;
-
           return list[0]?.id || "";
         });
       },
       (err) => {
-        console.error(
-          "monsters listen error:",
-          err
-        );
+        console.error("monsters listen error:", err);
+        setMonstersLoaded(true);
       }
     );
 
@@ -1383,23 +1384,34 @@ export default function DashboardPage() {
         >
           <div style={{ opacity: 0.9 }}>👹 選擇怪物：</div>
 
-          <select
-            value={selectedMonsterId}
-            onChange={(e) =>
-              setSelectedMonsterId(e.target.value)
-            }
-            disabled={monsters.length === 0}
-            style={{
-              padding: 8,
-              minWidth: 220,
-            }}
-          >
-            {monsters.length === 0 ? (
-              <option value="">
-                尚無怪物
-              </option>
-            ) : (
-              monsters.map((monster) => (
+          {monstersLoaded && monsters.length === 0 ? (
+            <button
+              className="rpg-btn"
+              onClick={async () => {
+                try {
+                  await seedDefaultMonsters(classId);
+                  alert("怪物資料建立完成");
+                } catch (e) {
+                  console.error("seedDefaultMonsters error:", e);
+                  alert("建立預設怪物失敗");
+                }
+              }}
+            >
+              建立預設怪物
+            </button>
+          ) : (
+            <select
+              value={selectedMonsterId}
+              onChange={(e) =>
+                setSelectedMonsterId(e.target.value)
+              }
+              disabled={monsters.length === 0}
+              style={{
+                padding: 8,
+                minWidth: 220,
+              }}
+            >
+              {monsters.map((monster) => (
                 <option
                   key={monster.id}
                   value={monster.id}
@@ -1407,9 +1419,9 @@ export default function DashboardPage() {
                   {monster.name}
                   （HP {monster.maxHp}）
                 </option>
-              ))
-            )}
-          </select>
+              ))}
+            </select>
+          )}
           {!showBattle ? (
             <button className="rpg-btn" onClick={startRaid}>開始歷練</button>
           ) : (

@@ -19,6 +19,7 @@ import {
   limit,
   runTransaction,
 } from "firebase/firestore";
+import PasswordInput from "../components/PasswordInput";
 
 function normName(s) {
   return (s ?? "").trim();
@@ -208,116 +209,110 @@ export default function StudentLoginPage() {
   }
 
   return (
-        <div
-          style={{
-            minHeight: "100vh",
-            backgroundImage: 'url("/background.jpg")',
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "column",
-            color: "#fff",
-            position: "relative",
-          }}
-        >
-          {/* ✅ 跟老師頁面一樣的「框框卡片」 */}
-    <div className="login-wrap">
-    <div className="login-card">
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundImage: 'url("/background.jpg")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        color: "#fff",
+        position: "relative",
+      }}
+    >
+      {/* ✅ 跟老師頁面一樣的「框框卡片」 */}
+      <div className="login-wrap">
+        <div className="login-card">
+          <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
+            <h2 style={{ marginBottom: 10 }}>學生登入</h2>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <button
+                className="rpg-btn sm"
+                onClick={() => setTab("login")}
+                style={{ opacity: tab === "login" ? 1 : 0.6 }}
+                disabled={busy}
+              >
+                登入
+              </button>
+              <button
+                className="rpg-btn sm"
+                onClick={() => setTab("claim")}
+                style={{ opacity: tab === "claim" ? 1 : 0.6 }}
+                disabled={busy}
+              >
+                註冊 / 認領加入班級
+              </button>
+            </div>
 
-    <div style={{ maxWidth: 520, margin: "70px auto", fontFamily: "sans-serif" }}>
-      <h2 style={{ marginBottom: 10 }}>學生登入</h2>
+            <label>Email</label>
+            <input
+              style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <button
-          className="rpg-btn sm"
-          onClick={() => setTab("login")}
-          style={{ opacity: tab === "login" ? 1 : 0.6 }}
-          disabled={busy}
-        >
-          登入
-        </button>
-        <button
-          className="rpg-btn sm"
-          onClick={() => setTab("claim")}
-          style={{ opacity: tab === "claim" ? 1 : 0.6 }}
-          disabled={busy}
-        >
-          註冊 / 認領加入班級
-        </button>
+            <PasswordInput
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              autoComplete={tab === "login" ? "current-password" : "new-password"}
+            />
+
+            {tab === "claim" && (
+              <>
+                <label>弟子名稱（必填：要跟老師建立的一樣）</label>
+                <input
+                  style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="例如：花前"
+                />
+
+                <label>班級代碼（必填：老師提供）</label>
+                <input
+                  style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
+                  value={classCode}
+                  onChange={(e) => setClassCode(e.target.value)}
+                  placeholder="例如：RRXJSQ"
+                />
+              </>
+            )}
+
+            {msg && <div style={{ color: msg.includes("✅") ? "green" : "crimson", marginBottom: 10 }}>{msg}</div>}
+
+            {tab === "login" ? (
+              <>
+                <button className="rpg-btn" onClick={handleLogin} disabled={busy}>
+                  {busy ? "登入中..." : "登入"}
+                </button>
+
+                <button
+                  type="button" onClick={handleForgotPassword} disabled={busy} style={{
+                    display: "block",
+                    marginTop: 12,
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
+                    color: "#555",
+                    textDecoration: "underline",
+                    cursor: busy ? "default" : "pointer",
+                  }}
+                >
+                  忘記密碼？
+                </button>
+              </>
+            ) : (
+              <button className="rpg-btn" onClick={handleRegisterAndClaim} disabled={busy}>
+                {busy ? "處理中..." : "註冊並認領弟子"}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-
-      <label>Email</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        autoComplete="email"
-      />
-
-      <label>密碼</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-        value={pw}
-        onChange={(e) => setPw(e.target.value)}
-        placeholder="至少 6 碼"
-        type="password"
-        autoComplete={tab === "login" ? "current-password" : "new-password"}
-      />
-
-      {tab === "claim" && (
-        <>
-          <label>弟子名稱（必填：要跟老師建立的一樣）</label>
-          <input
-            style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            placeholder="例如：花前"
-          />
-
-          <label>班級代碼（必填：老師提供）</label>
-          <input
-            style={{ width: "100%", padding: 10, margin: "6px 0 14px" }}
-            value={classCode}
-            onChange={(e) => setClassCode(e.target.value)}
-            placeholder="例如：RRXJSQ"
-          />
-        </>
-      )}
-
-      {msg && <div style={{ color: msg.includes("✅") ? "green" : "crimson", marginBottom: 10 }}>{msg}</div>}
-
-      {tab === "login" ? (
-        <>
-          <button className="rpg-btn" onClick={handleLogin} disabled={busy}>
-            {busy ? "登入中..." : "登入"}
-          </button>
-
-          <button
-            type="button" onClick={handleForgotPassword} disabled={busy} style={{
-              display: "block",
-              marginTop: 12,
-              padding: 0,
-              border: "none",
-              background: "transparent",
-              color: "#555",
-              textDecoration: "underline",
-              cursor: busy ? "default" : "pointer",
-            }}
-          >
-            忘記密碼？
-          </button>
-        </>
-      ) : (
-        <button className="rpg-btn" onClick={handleRegisterAndClaim} disabled={busy}>
-          {busy ? "處理中..." : "註冊並認領弟子"}
-        </button>
-      )}
-    </div>
-    </div>
-    </div>
     </div>
   );
 }

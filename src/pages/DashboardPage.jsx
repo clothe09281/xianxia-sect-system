@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
@@ -18,8 +19,19 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
-import { calcLevelFromXp, calcStudentTotalPower } from "../utils/studentStats";
+import { 
+  calcLevelFromXp, 
+  calcStudentTotalPower 
+} from "../utils/studentStats";
+import {
+  createChallengeSession,
+  abortChallengeSession,
+  recordChallengeAnswer,
+  completeChallengeSession
+} from "../services/challengeService";
+import{
+  seedDefaultMonsters
+}from "../services/monsterService";
 
 // 🏮 藏寶閣商品
 import TreasureShop from "../components/TreasureShop";
@@ -28,11 +40,15 @@ import { SHOP_ITEMS } from "../data/shopItems"; // 你的資料檔
 import Papa from "papaparse";
 
 /** ✅ 通用 Modal：置中 + 背景變暗 + 點背景關閉 */
-function Modal({ open, title, onClose, children, width = 860 }) {
+function Modal({ open, title, onClose, children, width = 860 ,closeOnBackdrop = true}) {
   if (!open) return null;
   return (
     <div
-      onMouseDown={onClose}
+      onMouseDown={
+        closeOnBackdrop
+          ? onClose
+          : undefined
+      }
       style={{
         position: "fixed",
         inset: 0,
@@ -69,23 +85,14 @@ function Modal({ open, title, onClose, children, width = 860 }) {
   );
 }
 
-// ⚔️ 怪物名冊
-const MONSTERS = [
-  { id: "bandit", name: "山賊", hp: 30, xpWin: 12, cpWin: 6, coinWin: 5, img: "/monsters/monster_001.png" },
-  { id: "goblin", name: "地精矮人", hp: 45, xpWin: 16, cpWin: 8, coinWin: 6, img: "/monsters/monster_002.png" },
-  { id: "golem", name: "機關傀儡", hp: 65, xpWin: 22, cpWin: 10, coinWin: 8, img: "/monsters/monster_003.png" },
-  { id: "cyclops", name: "獨眼巨人", hp: 90, xpWin: 30, cpWin: 14, coinWin: 10, img: "/monsters/monster_004.png" },
-  { id: "tengu", name: "天狗", hp: 120, xpWin: 40, cpWin: 18, coinWin: 15, img: "/monsters/monster_005.png" },
-];
-
-function HPBar({ now, max }) {
+function HPBar({ now, max , width = 260}) {
   const safeMax = Math.max(1, Number(max ?? 100));
   const safeNow = Math.max(0, Math.min(safeMax, Number(now ?? safeMax)));
   const pct = Math.max(0, Math.min(100, (safeNow / safeMax) * 100));
   const isDanger = safeNow / safeMax <= 0.2;
 
   return (
-    <div className={isDanger ? "hp-danger" : ""} style={{ width: 260 }}>
+    <div className={isDanger ? "hp-danger" : ""} style={{ width: "100%", maxWidth: width }}>
       <div style={{ height: 14, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(218,185,120,0.6)", borderRadius: 10, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(180deg, #ff4d4d, #ffa94d)" }} />
       </div>
@@ -93,7 +100,6 @@ function HPBar({ now, max }) {
     </div>
   );
 }
-
 
 // ✅ 用 users/{uid} 判斷老師
 async function ensureTeacherRole(user) {
@@ -136,11 +142,23 @@ export default function DashboardPage() {
   const [openTreasure, setOpenTreasure] = useState(false);
 
   // 歷練
-  const [selectedMonsterId, setSelectedMonsterId] = useState(MONSTERS[0].id);
+  const [monsters, setMonsters] = useState([]);
+  const [monstersLoaded, setMonstersLoaded] = useState(false);
+  const [selectedMonsterId, setSelectedMonsterId] = useState("");
+
   const [battle, setBattle] = useState(null);
   const [showBattle, setShowBattle] = useState(false);
+
+  // 目前 checkbox 勾選的學生
   const [raidParticipants, setRaidParticipants] = useState([]);
-  const [answererId, setAnswererId] = useState(null);
+
+  // Firestore 中這一次歷練的 session id
+  const [challengeSessionId, setChallengeSessionId] = useState(null);
+
+  // 整場歷練中每位學生的答題紀錄
+  const [battleRecords, setBattleRecords] = useState({});
+
+  const [isResolvingAnswer, setIsResolvingAnswer] = useState(false);
 
   // 稱號彈窗
   const [openTitles, setOpenTitles] = useState(false);
@@ -217,6 +235,48 @@ export default function DashboardPage() {
   return () => unsub();
 }, [classId]);
 
+  useEffect(() => {
+    if (!classId) return;
+
+    const monstersRef = collection(
+      db,
+      "classes",
+      classId,
+      "monsters"
+    );
+
+    const monstersQuery = query(
+      monstersRef,
+      orderBy("order", "asc")
+    );
+
+    const unsub = onSnapshot(
+      monstersQuery,
+      (snap) => {
+        const list = snap.docs
+          .map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }))
+          .filter((monster) => monster.isActive !== false);
+
+        setMonsters(list);
+        setMonstersLoaded(true);
+
+        setSelectedMonsterId((current) => {
+          if (current) return current;
+          return list[0]?.id || "";
+        });
+      },
+      (err) => {
+        console.error("monsters listen error:", err);
+        setMonstersLoaded(true);
+      }
+    );
+
+    return () => unsub();
+  }, [classId]);
+
   // ✅ 更新學生（統一出口）
   async function patchStudent(studentDocId, data) {
     if (!classId) return;
@@ -265,8 +325,6 @@ export default function DashboardPage() {
 
     setName("");
   }
-
-  
 
   // ===============================
   // 修為增減（答對 / 答錯）
@@ -342,9 +400,15 @@ export default function DashboardPage() {
     setShowBattle(false);
     setBattle(null);
     setRaidParticipants([]);
-    setAnswererId(null);
   }
 
+  function resetRaidState() {
+    setShowBattle(false);
+    setBattle(null);
+    setRaidParticipants([]);
+    setBattleRecords({});
+    setChallengeSessionId(null);
+  }
   // ===============================
   // 🎲 基本機率判定
   // ===============================
@@ -352,12 +416,39 @@ export default function DashboardPage() {
     return Math.random() < rate;
   }
 
-  function closeRaidModal() {
-    setOpenRaid(false);
-    setShowBattle(false);
-    setBattle(null);
-    setRaidParticipants([]);
-    setAnswererId(null);
+  async function closeRaidModal() {
+    // 正在寫入答題資料時先不要關閉
+    if (isResolvingAnswer) {
+      alert("答題結果處理中，請稍候");
+      return;
+    }
+
+    // 沒有進行中的歷練，直接關閉
+    if (!challengeSessionId) {
+      resetRaidState();
+      setOpenRaid(false);
+      return;
+    }
+
+    // 已經建立 session，代表目前有一場歷練正在進行
+    const ok = window.confirm(
+      "目前歷練尚未結算，關閉後本場歷練將標記為「中止」。確定要離開嗎？"
+    );
+
+    if (!ok) return;
+
+    try {
+      await abortChallengeSession({
+        classId,
+        sessionId: challengeSessionId,
+      });
+
+      resetRaidState();
+      setOpenRaid(false);
+    } catch (e) {
+      console.error("closeRaidModal error:", e);
+      alert("中止歷練失敗，請稍後再試");
+    }
   }
 
   function toggleRaidParticipant(studentDocId) {
@@ -366,26 +457,198 @@ export default function DashboardPage() {
     );
   }
 
-  function startRaid() {
-    const monster = MONSTERS.find((m) => m.id === selectedMonsterId);
-    if (!monster) return alert("找不到怪物");
+  async function startRaid() {
+    const monster = monsters.find(
+      (m) => m.id === selectedMonsterId
+    );
 
-    setBattle({ monster, hp: monster.hp });
-    setShowBattle(true);
-    setRaidParticipants([]);
-    setAnswererId(null);
+    if (!monster) {
+      alert("找不到怪物");
+      return;
+    }
+
+    if (!classId || !user?.uid) {
+      alert("班級資料尚未載入完成");
+      return;
+    }
+
+    try {
+      const sessionId = await createChallengeSession({
+        classId,
+        monster,
+        teacherUid: user.uid,
+      });
+
+      setChallengeSessionId(sessionId);
+
+      setBattle({
+        monster,
+        hp: monster.maxHp,
+      });
+
+      setShowBattle(true);
+
+      // 這一題目前勾選誰
+      setRaidParticipants([]);
+
+      // 新副本清空戰鬥紀錄
+      setBattleRecords({});
+    } catch (e) {
+      console.error("startRaid error:", e);
+      alert("建立歷練紀錄失敗");
+    }
   }
 
-  function answerCorrect() {
-    setBattle((prev) => {
-      if (!prev) return prev;
-      return { ...prev, hp: Math.max(0, (prev.hp ?? 0) - 10) };
+  function buildNextBattleRecords(records, studentIds, result) {
+    const next = { ...records };
+
+    studentIds.forEach((studentId) => {
+      const previous = next[studentId] || {
+        correctCount: 0,
+        wrongCount: 0,
+      };
+
+      next[studentId] = {
+        correctCount:
+          previous.correctCount +
+          (result === "correct" ? 1 : 0),
+
+        wrongCount:
+          previous.wrongCount +
+          (result === "wrong" ? 1 : 0),
+      };
     });
+
+    return next;
+  }
+
+  async function answerCorrect() {
+    if (isResolvingAnswer) return;
+
+    if (!battle || (battle.hp ?? 0) <= 0) {
+      return;
+    }
+
+    if (raidParticipants.length === 0) {
+      alert("請先勾選答題學生");
+      return;
+    }
+
+    if (!challengeSessionId) {
+      alert("歷練場次尚未建立");
+      return;
+    }
+
+    const selectedStudents = raidParticipants
+      .map((studentId) =>
+        students.find((student) => student.id === studentId)
+      )
+      .filter(Boolean);
+
+    if (selectedStudents.length === 0) {
+      alert("找不到已勾選的學生資料");
+      return;
+    }
+
+    // 一個學生造成 10 點傷害
+    const damage = selectedStudents.length * 10;
+
+    const nextHp = Math.max(
+      0,
+      Number(battle.hp ?? 0) - damage
+    );
+
+    const nextRecords = buildNextBattleRecords(
+      battleRecords,
+      raidParticipants,
+      "correct"
+    );
+
+    try {
+      setIsResolvingAnswer(true);
+
+      await recordChallengeAnswer({
+        classId,
+        sessionId: challengeSessionId,
+        students: selectedStudents,
+        result: "correct",
+
+        // 曾經參與過的人數
+        participantCount: Object.keys(nextRecords).length,
+      });
+
+      // Firestore 成功後才更新畫面
+      setBattle((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          hp: nextHp,
+        };
+      });
+
+      setBattleRecords(nextRecords);
+    } catch (e) {
+      console.error("answerCorrect error:", e);
+      alert(e?.message || "答對紀錄更新失敗");
+    } finally {
+      setIsResolvingAnswer(false);
+    }
   }
 
   async function answerWrong() {
-    if (!answererId) return;
-    await patchStudent(answererId, { hpNow: increment(-10) });
+    if (isResolvingAnswer) return;
+
+    if (!battle || (battle.hp ?? 0) <= 0) {
+      return;
+    }
+
+    if (raidParticipants.length === 0) {
+      alert("請先勾選答題學生");
+      return;
+    }
+
+    if (!challengeSessionId) {
+      alert("歷練場次尚未建立");
+      return;
+    }
+
+    const selectedStudents = raidParticipants
+      .map((studentId) =>
+        students.find((student) => student.id === studentId)
+      )
+      .filter(Boolean);
+
+    if (selectedStudents.length === 0) {
+      alert("找不到已勾選的學生資料");
+      return;
+    }
+
+    const nextRecords = buildNextBattleRecords(
+      battleRecords,
+      raidParticipants,
+      "wrong"
+    );
+
+    try {
+      setIsResolvingAnswer(true);
+
+      await recordChallengeAnswer({
+        classId,
+        sessionId: challengeSessionId,
+        students: selectedStudents,
+        result: "wrong",
+        participantCount: Object.keys(nextRecords).length,
+      });
+
+      setBattleRecords(nextRecords);
+
+    } catch (e) {
+      console.error("answerWrong error:", e);
+      alert(e?.message || "答錯紀錄更新失敗");
+    } finally {
+      setIsResolvingAnswer(false);
+    }
   }
 
   // ===============================
@@ -462,13 +725,13 @@ export default function DashboardPage() {
           const oldHpMax = Number(studentData.hpMax || 100);
           const coinNow = Number(studentData.coin || 0);
 
-          const nextXp = Math.max(0, oldXp + Number(monster.xpWin || 0));
-          const nextCp = Math.max(0, oldCp + Number(monster.cpWin || 0));
+          const nextXp = Math.max(0, oldXp + Number(monster.xpReward || 0));
+          const nextCp = Math.max(0, oldCp + Number(monster.cpReward || 0));
+          const nextCoin = Math.max(0, coinNow + Number(monster.coinReward || 0));
           const nextLevel = Math.max(oldLevel, calcLevelFromXp(nextXp));
           const levelGain = nextLevel - oldLevel;
 
-          // 加成系統暫停：妖丹固定 100、掉落率固定
-          const finalCoinReward = 100;
+          // 加成系統暫停：掉落率固定
           const meteorRate = 0.5;
           const forgeRate = 0.4;
           const blackIronRate = 0.03;
@@ -482,15 +745,15 @@ export default function DashboardPage() {
             classId,
             studentId,
             monster: monster.name,
-            xpWin: monster.xpWin,
-            cpWin: monster.cpWin,
+            xpReward: monster.xpReward,
+            cpReward: monster.cpReward,
+            coinReward: monster.coinReward,
             meteorRate,
             forgeRate,
             blackIronRate,
             dropMeteor,
             dropForge,
             dropBlackIron,
-            finalCoinReward,
           });
 
           // 2) 只有真的掉落時才讀素材文件
@@ -506,7 +769,7 @@ export default function DashboardPage() {
           const studentPatch = {
             xp: nextXp,
             cp: nextCp,
-            coin: coinNow + finalCoinReward,
+            coin: nextCoin,
             updatedAt: serverTimestamp(),
           };
 
@@ -584,17 +847,91 @@ export default function DashboardPage() {
         });
       }
 
-      // 結算後關閉本場，避免同一場重複領獎
-      setShowBattle(false);
-      setBattle(null);
-      setRaidParticipants([]);
-      setAnswererId(null);
+      // =========================
+      // 完成本次歷練紀錄
+      // =========================
+      if (challengeSessionId) {
+        await completeChallengeSession({
+          classId,
+          sessionId: challengeSessionId,
+          participantCount: participants.length,
+        });
+      }
 
-      alert("🎁 歷練獎勵發放完成！");
+      // =========================
+      // 清除本場前端狀態
+      // =========================
+      resetRaidState();
+
+      alert("🏆 歷練結算完成！");
     } catch (e) {
       console.error("handlePracticeRewards error:", e);
       alert(e?.message || "發放獎勵失敗");
     }
+  }
+
+  async function settleRaid() {
+    if (!battle) return;
+
+    if ((battle.hp ?? 0) > 0) {
+      alert("尚未擊敗怪物");
+      return;
+    }
+
+    const participantIds = Object.keys(battleRecords);
+
+    if (participantIds.length === 0) {
+      alert("本場沒有參與學生");
+      return;
+    }
+
+    const participants = participantIds
+      .map((studentId) => {
+        const student = students.find(
+          (s) => s.id === studentId
+        );
+
+        if (!student) return null;
+
+        return {
+          classId,
+          studentId: student.id,
+          name: student.name,
+        };
+      })
+      .filter(Boolean);
+
+    await handlePracticeRewards(participants);
+  }
+
+  async function resetCurrentRaid() {
+    if (isResolvingAnswer) {
+      alert("答題結果處理中，請稍候");
+      return;
+    }
+
+    if (challengeSessionId) {
+      const ok = window.confirm(
+        "目前歷練尚未結算，重新選擇怪物會中止本場歷練。確定要繼續嗎？"
+      );
+
+      if (!ok) return;
+
+      try {
+        await abortChallengeSession({
+          classId,
+          sessionId: challengeSessionId,
+        });
+      } catch (e) {
+        console.error("resetCurrentRaid error:", e);
+        alert("中止歷練失敗");
+        return;
+      }
+    }
+
+    resetRaidState();
+
+    // 不關 Modal
   }
 
   function normHeader(h) {
@@ -779,6 +1116,26 @@ export default function DashboardPage() {
     });
   }, [students]);
 
+  const battleRecordList = useMemo(() => {
+    return sortedStudents
+      .filter((student) => battleRecords[student.id])
+      .map((student) => {
+        const record = battleRecords[student.id];
+
+        return {
+          studentId: student.id,
+          name: student.name || student.id,
+
+          level: Number(student.level ?? 1),
+          hpNow: Number(student.hpNow ?? 100),
+          hpMax: Number(student.hpMax ?? 100),
+
+          correctCount: Number(record.correctCount ?? 0),
+          wrongCount: Number(record.wrongCount ?? 0),
+        };
+      });
+  }, [sortedStudents, battleRecords]);
+
   // achievements 排序：優先用 threshold（若有），沒有就不排序
   const achievementsSorted = useMemo(() => {
     const arr = [...achievements];
@@ -897,8 +1254,8 @@ export default function DashboardPage() {
           <button className="rpg-btn" onClick={openRaidModal}>修仙歷練</button>
           <button className="rpg-btn" onClick={() => setOpenRank(true)}>戰力榜</button>
           <button className="rpg-btn" onClick={() => setOpenTreasure(true)}>藏寶閣</button>
-          <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
           <button className="rpg-btn" onClick={() => setOpenImportAch(true)}>📥 匯入成就</button>
+          <button className="rpg-btn" onClick={() => signOut(auth)}>登出</button>
         </div>
       </div>
 
@@ -1007,8 +1364,14 @@ export default function DashboardPage() {
       </table>
 
       {/* ===================== 歷練彈窗 ===================== */}
-      <Modal open={openRaid} title="⚔️ 歷練視窗" onClose={closeRaidModal} width={1564}>
-        {/* 上方工具列（只放：選怪物/開始/重新選） */}
+      <Modal 
+        open={openRaid}
+        title="⚔️ 歷練視窗"
+        onClose={closeRaidModal}
+        width={1564}
+        closeOnBackdrop={false}
+      >
+        {/* 上方工具列 */}
         <div
           style={{
             display: "flex",
@@ -1021,259 +1384,483 @@ export default function DashboardPage() {
         >
           <div style={{ opacity: 0.9 }}>👹 選擇怪物：</div>
 
-          <select
-            value={selectedMonsterId}
-            onChange={(e) => setSelectedMonsterId(e.target.value)}
-            style={{ padding: 8, minWidth: 220 }}
-          >
-            {MONSTERS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}（HP {m.hp}）
-              </option>
-            ))}
-          </select>
-
+          {monstersLoaded && monsters.length === 0 ? (
+            <button
+              className="rpg-btn"
+              onClick={async () => {
+                try {
+                  await seedDefaultMonsters(classId);
+                  alert("怪物資料建立完成");
+                } catch (e) {
+                  console.error("seedDefaultMonsters error:", e);
+                  alert("建立預設怪物失敗");
+                }
+              }}
+            >
+              建立預設怪物
+            </button>
+          ) : (
+            <select
+              value={selectedMonsterId}
+              onChange={(e) =>
+                setSelectedMonsterId(e.target.value)
+              }
+              disabled={monsters.length === 0}
+              style={{
+                padding: 8,
+                minWidth: 220,
+              }}
+            >
+              {monsters.map((monster) => (
+                <option
+                  key={monster.id}
+                  value={monster.id}
+                >
+                  {monster.name}
+                  （HP {monster.maxHp}）
+                </option>
+              ))}
+            </select>
+          )}
           {!showBattle ? (
             <button className="rpg-btn" onClick={startRaid}>開始歷練</button>
           ) : (
             <button
               className="rpg-btn"
-              onClick={() => {
-                setShowBattle(false);
-                setBattle(null);
-                setRaidParticipants([]);
-                setAnswererId(null);
-              }}
+              onClick={resetCurrentRaid}
             >
               重新選怪物
             </button>
           )}
 
-          <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>
-            {answererId
-              ? `答題者：${sortedStudents.find((s) => s.id === answererId)?.name || ""}`
-              : "尚未指定答題者"}
+          <div
+            style={{
+              marginLeft: "auto",
+              fontSize: 13,
+              opacity: 0.85,
+            }}
+          >
+            本場參與：
+            <strong style={{ marginLeft: 4 }}>
+              {battleRecordList.length}
+            </strong>
+            人
           </div>
         </div>
 
         <div style={{ height: 30 }} />
 
-        {/* 作戰畫面 */}
+        {/* ================= 作戰畫面 ================= */}
         {showBattle && battle?.monster ? (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1.25fr 0.9fr 0.85fr",
-              gap: 16,
-              alignItems: "start",
+              gridTemplateColumns: "0.9fr 1.15fr 1fr",
+              gap: 18,
+              alignItems: "stretch",
             }}
           >
-            {/* ================= 左：怪物區 ================= */}
+            {/* ================= 左：怪物狀態 ================= */}
             <div
               style={{
-                padding: 14,
+                padding: 18,
                 border: "1px solid rgba(218,185,120,0.25)",
-                borderRadius: 10,
-                display: "grid",
-                gridTemplateColumns: "1fr 250px",
-                gap: 14,
-                alignItems: "center",
-                minHeight: 350,
+                borderRadius: 12,
+                minHeight: 500,
               }}
             >
               <div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>👹 {battle.monster.name}</div>
-
-                <div style={{ marginTop: 10 }}>
-                  <HPBar now={battle.hp ?? 0} max={battle.monster.hp ?? 100} />
+                {/* 怪物名稱 */}
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                  }}
+                >
+                  👹 {battle.monster.name}
                 </div>
 
-                {!answererId && (
-                  <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
-                    請先到右側「參戰列表」指定答題者
-                  </div>
-                )}
-
-                {/* ✅ 答對/答錯移回原位（左側） */}
-                <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {(battle.hp ?? 0) > 0 ? (
-                    <>
-                      <button className="rpg-btn" onClick={answerCorrect} disabled={!answererId}>
-                        ✅ 答對
-                      </button>
-                      <button className="rpg-btn danger" onClick={answerWrong} disabled={!answererId}>
-                        ❌ 答錯
-                      </button>
-                    </>
-                  ) : (
-                    <button
-        className="rpg-btn"
-        onClick={() =>
-          handlePracticeRewards(
-            raidParticipants
-              .map((sid) => {
-                const s = students.find((x) => x.id === sid);
-                return {
-                  classId: classId,
-                  studentId: s?.id,
-                  name: s?.name,
-                };
-              })
-              .filter((x) => x.classId && x.studentId)
-          )
-        }
-      >
-        🎁 發放歷練獎勵
-      </button>
-                  )}
-                </div>
-
-                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                  參戰人數：{raidParticipants.length}
-                </div>
-              </div>        
-                <img
-                  src={battle.monster.img}
-                  alt={battle.monster.name}
-                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                {/* 怪物血量 */}
+                <HPBar
+                  now={battle.hp ?? 0}
+                  max={battle.monster.maxHp ?? 100}
                 />
+                
+                {/* 怪物圖片 */}
+                <div
+                  style={{
+                    marginTop: 25,
+                    height: 330,
+
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+
+                    borderRadius: 12,
+
+                    background:
+                      "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <img
+                    src={battle.monster.imagePath}
+                    alt={battle.monster.name}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* ================= 中：勾選名單（縮小字+框） ================= */}
+            {/* ================= 中：學生選擇 + 答題操作 ================= */}
             <div
               style={{
-                padding: 14,
+                padding: 18,
                 border: "1px solid rgba(218,185,120,0.25)",
-                borderRadius: 10,
-                minHeight: 360,
+                borderRadius: 12,
+                minHeight: 500,
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              <div style={{ fontSize: 15, fontWeight: 800 }}>🧑‍🎓 參戰名單（勾選）</div>
-              <div style={{ marginTop: 6, fontSize: 11, opacity: 0.75 }}>
-                依「數字優先」排序；可捲動
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 800,
+                }}
+              >
+                🧑 弟子參戰名單
               </div>
 
               <div
                 style={{
-                  marginTop: 10,
+                  marginTop: 6,
+                  fontSize: 12,
+                  opacity: 0.7,
+                }}
+              >
+                勾選本次作答的弟子，可一次選擇多人
+              </div>
+              
+              {/* =================學生checkbox================= */}
+              <div
+                style={{
+                  marginTop: 14,
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: "6px 10px",          // ✅ 間距縮小
-                  maxHeight: 420,
+                  gap: 8,
+                  maxHeight: 370,
                   overflow: "auto",
                   paddingRight: 6,
                 }}
               >
-                {sortedStudents.map((s) => {
-                  const checked = raidParticipants.includes(s.id);
+                {sortedStudents.map((student) => {
+                  const checked = raidParticipants.includes(student.id);
+
                   return (
                     <label
-                      key={s.id}
+                      key={student.id}
                       style={{
                         display: "flex",
-                        gap: 6,
                         alignItems: "center",
-                        padding: "7px 7px",   // ✅ 卡片縮小
+                        gap: 8,
+                        padding: "9px 10px",
                         borderRadius: 8,
-                        background: checked ? "rgba(255,215,0,0.06)" : "transparent",
-                        border: checked ? "1px solid rgba(218,185,120,0.30)" : "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer",
+                        background: checked
+                          ? "rgba(255,215,0,0.08)"
+                          : "rgba(255,255,255,0.025)",
+                        border: checked
+                          ? "1px solid rgba(218,185,120,0.55)"
+                          : "1px solid rgba(255,255,255,0.08)",
                       }}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleRaidParticipant(s.id)}
-                        style={{ transform: "scale(0.95)" }} // ✅ 勾勾略小
+                        onChange={() =>
+                          toggleRaidParticipant(student.id)
+                        }
                       />
+
                       <span
                         style={{
+                          fontSize: 16,
                           fontWeight: 700,
-                          fontSize: 16,        // ✅ 名字縮小
-                          lineHeight: 1.1,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          maxWidth: 140,
                         }}
-                        title={s.name}
                       >
-                        {s.name}
+                        {student.name}
                       </span>
                     </label>
                   );
                 })}
               </div>
-            </div>
 
-            {/* ================= 右：指定答題者 ================= */}
-            <div
-              style={{
-                padding: 60,
-                border: "1px solid rgba(218,185,120,0.25)",
-                borderRadius: 10,
-                justifySelf: "end",
-                minHeight: 360,
-              }}
-            >
-              <div style={{ fontSize: 15, fontWeight: 800 }}>🎯 參戰列表（指定答題者）</div>
-
-              {raidParticipants.length === 0 ? (
-                <div style={{ marginTop: 12, opacity: 0.8, fontSize: 13 }}>尚未選擇參戰弟子</div>
-              ) : (
+              {/* =================答題操作================= */}
+              <div
+                style={{
+                  marginTop: "auto",
+                  paddingTop: 20,
+                  borderTop: "1px solid rgba(255,255,255,0.10)",
+                }}
+              >
                 <div
                   style={{
-                    marginTop: 12,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    maxHeight: 420,
-                    overflow: "auto",
-                    paddingRight: 6,
+                    textAlign: "center",
+                    fontSize: 13,
+                    opacity: 0.8,
+                    marginBottom: 12,
                   }}
                 >
-                  {sortedStudents
-                    .filter((s) => raidParticipants.includes(s.id))
-                    .map((s) => (
+                  已選擇{" "}
+                  <strong>
+                    {raidParticipants.length}
+                  </strong>{" "}
+                  位弟子
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: 16,
+                  }}
+                >
+                  <button
+                    className="rpg-btn"
+                    onClick={answerCorrect}
+                    disabled={
+                      isResolvingAnswer ||
+                      raidParticipants.length === 0
+                    }
+                    style={{
+                      minWidth: 130,
+                      fontSize: 18,
+                      padding: "12px 20px",
+                    }}
+                  >
+                    ✅ 答對
+                  </button>
+
+                  <button
+                    className="rpg-btn danger"
+                    onClick={answerWrong}
+                    disabled={
+                      isResolvingAnswer ||
+                      raidParticipants.length === 0
+                    }
+                    style={{
+                      minWidth: 130,
+                      fontSize: 18,
+                      padding: "12px 20px",
+                    }}
+                  >
+                    ❌ 答錯
+                  </button>
+                </div>
+
+                {raidParticipants.length > 1 && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      marginTop: 10,
+
+                      fontSize: 12,
+                      opacity: 0.7,
+                    }}
+                  >
+                    答對將造成{" "}
+                    <strong>
+                      {raidParticipants.length * 10}
+                    </strong>{" "}
+                    點傷害
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ================= 右：戰鬥紀錄 ================= */}
+            <div
+              style={{
+                padding: 18,
+                border: "1px solid rgba(218,185,120,0.25)",
+                borderRadius: 12,
+                minHeight: 500,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 70px 70px",
+                  alignItems: "center",
+                  columnGap: 8,
+                  paddingBottom: 10,
+                  borderBottom: "1px solid rgba(255,255,255,0.12)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                  }}
+                >
+                  ⚔️ 戰鬥紀錄
+                </div>
+
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ⭕ 答對
+                </div>
+
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ❌ 答錯
+                </div>
+              </div>
+
+              {/* =================戰鬥紀錄列表================= */}
+
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  maxHeight: 385,
+                  overflow: "auto",
+                  paddingRight: 4,
+                }}
+              >
+                {battleRecordList.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 20,
+                      textAlign: "center",
+                      opacity: 0.6,
+                    }}
+                  >
+                    尚無戰鬥紀錄
+                  </div>
+                ) : (
+                  battleRecordList.map((record) => (
+                    <div
+                      key={record.studentId}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 55px 55px",
+                        alignItems: "center",
+                        padding: 10,
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.035)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                      }}
+                    >
+
+                      {/* 學生資料 */}
+                      <div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center"}}>
+                          <strong> {record.name} </strong>
+                          <span style={{ fontSize: 12, opacity: 0.7 }}> Lv {record.level} </span>
+                        </div>
+                        <HPBar now={record.hpNow} max={record.hpMax} width={180}/>
+                      </div>
+
+                      {/* 答對 */}
                       <div
-                        key={s.id}
                         style={{
-                          padding: 10,
-                          borderRadius: 10,
-                          border:
-                            answererId === s.id
-                              ? "1px solid rgba(218,185,120,0.90)"
-                              : "1px solid rgba(255,255,255,0.12)",
-                          background: answererId === s.id ? "rgba(255,215,0,0.06)" : "rgba(255,255,255,0.03)",
+                          textAlign: "center",
+                          fontSize: 22,
+                          fontWeight: 800,
+                          color: "#8ce99a",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <input
-                              type="radio"
-                              name="answerer"
-                              checked={answererId === s.id}
-                              onChange={() => setAnswererId(s.id)}
-                            />
-                            <strong>{s.name}</strong>
-                          </label>
-
-                          <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.85 }}>
-                            Lv {s.level ?? 1}
-                          </span>
-                        </div>
-
-                        <div style={{ marginTop: 8 }}>
-                          <HPBar now={Math.max(0, s.hpNow ?? 100)} max={s.hpMax ?? 100} />
-                        </div>
+                        {record.correctCount}
                       </div>
-                    ))}
-                </div>
-              )}
+
+                      {/* 答錯 */}
+                      <div
+                        style={{
+                          textAlign: "center",
+                          fontSize: 22,
+                          fontWeight: 800,
+                          color: "#ff8787",
+                        }}
+                      >
+                        {record.wrongCount}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* =================結算================= */}
+
+              <div
+                style={{
+                  marginTop: "auto",
+                  paddingTop: 20,
+                  borderTop: "1px solid rgba(255,255,255,0.10)",
+                }}
+              >
+                {(battle.hp ?? 0) <= 0 ? (
+                  <>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        marginBottom: 10,
+                        color: "#ffd43b",
+                        fontWeight: 700,
+                      }}
+                    >
+                      🎉 {battle.monster.name} 已擊敗！
+                    </div>
+
+                    <button
+                      className="rpg-btn"
+                      style={{
+                        width: "100%",
+                        padding: 13,
+                        fontSize: 18,
+                        fontWeight: 800,
+                      }}
+                      onClick={settleRaid}
+                    >
+                      🏆 結算
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="rpg-btn"
+                    disabled
+                    style={{
+                      width: "100%",
+                      opacity: 0.4,
+                    }}
+                  >
+                    🏆 擊敗怪物後結算
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ) : (
           <div style={{ opacity: 0.8, fontSize: 13 }}>
-            流程：按「歷練」→ 選怪物 → 「開始歷練」→ 進作戰畫面 → 再選參戰弟子
+            選擇怪物後按「開始歷練」
           </div>
         )}
       </Modal>

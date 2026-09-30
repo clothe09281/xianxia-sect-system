@@ -1242,7 +1242,17 @@ export default function DashboardPage() {
 
   return (
     <div style={{ width: "min(1400px, 96vw)", margin: "40px auto", fontFamily: "sans-serif" }}>
+      <a
+        className="feedback-link"
+        href="https://glorious-supernova-db3.notion.site/3ea287a1b24e80608ed2c6da85c796ce?pvs=105"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        💬 意見回饋
+      </a>
+
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        
         <div>
           <h2 style={{ margin: 0 }}>宗門名錄（老師模式）</h2>
           <div style={{ marginTop: 6, opacity: 0.85 }}>

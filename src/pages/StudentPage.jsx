@@ -1128,6 +1128,15 @@ if (!invSnap.exists()) {
 
   return (
     <div style={{ maxWidth: 860, margin: "60px auto", fontFamily: "sans-serif", color: "#fff" }}>
+      <a
+        className="feedback-link"
+        href="https://glorious-supernova-db3.notion.site/3ea287a1b24e80608ed2c6da85c796ce?pvs=105"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        💬 意見回饋
+      </a>
+      
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h2 style={{ margin: 0 }}>宗門弟子</h2>
 

@@ -148,3 +148,15 @@ body {
 .hp-danger {
   animation: hp-warning 1.4s ease-in-out infinite;
 }
+
+
+.feedback-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}

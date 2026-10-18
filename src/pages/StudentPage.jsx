@@ -513,8 +513,8 @@ setBagItems(arr.filter((x) => x.qty > 0));
     );
 
     const isPetItem = item.itemType === "pet";
-const isPetShardItem = item.itemType === "pet_shard";
-const isWeaponItem = item.itemType === "weapon";
+    const isPetShardItem = item.itemType === "pet_shard";
+    const isWeaponItem = item.itemType === "weapon";
 
     const category =
       item.id === "mat_lingbao_001" ||
@@ -594,60 +594,61 @@ const isWeaponItem = item.itemType === "weapon";
         }
 
         // 3) 神兵 / 其他商品：進 inventory
-const invSnap = await tx.get(inventoryRef);
+        const invSnap = await tx.get(inventoryRef);
 
-tx.update(sRef, {
-  coin: coinNow - cost,
-  updatedAt: serverTimestamp(),
-});
+        tx.update(sRef, {
+          coin: coinNow - cost,
+          updatedAt: serverTimestamp(),
+        });
 
-// ===============================
-// 神兵：寫入完整基礎詳情到背包
-// ===============================
-if (isWeaponItem) {
-  const master = WEAPONS_MASTER[item.id];
-  if (!master) throw new Error("找不到神兵主資料");
+        // ===============================
+        // 神兵：寫入完整基礎詳情到背包
+        // ===============================
+        if (isWeaponItem) {
+          const master = WEAPONS_MASTER[item.id];
+          if (!master) throw new Error("找不到神兵主資料");
 
-  if (!invSnap.exists()) {
-    tx.set(inventoryRef, {
-      ...createWeaponInventoryDoc(master),
-      acquiredAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } else {
-    const oldQty = Number(invSnap.data()?.qty || 0);
-    tx.update(inventoryRef, {
-      qty: oldQty + 1,
-      updatedAt: serverTimestamp(),
-    });
-  }
+          if (invSnap.exists() && Number(invSnap.data()?.qty || 0) > 0) {
+            throw new Error("你已經擁有這把神兵，無法重複購買");
+          }
 
-  return;
-}
+          tx.update(sRef, {
+            coin: coinNow - cost,
+            updatedAt: serverTimestamp(),
+          });
 
-// ===============================
-// 其他一般商品：進 inventory
-// ===============================
-if (!invSnap.exists()) {
-  const safeIcon = String(item.icon || "");
-  const iconToStore = safeIcon.startsWith("/") ? safeIcon : "";
+          tx.set(inventoryRef, {
+            ...createWeaponInventoryDoc(master),
+            acquiredAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
 
-  tx.set(inventoryRef, {
-    itemId: item.id,
-    name: item.name || "",
-    category,
-    icon: iconToStore,
-    qty: 1,
-    acquiredAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-} else {
-  const oldQty = Number(invSnap.data()?.qty || 0);
-  tx.update(inventoryRef, {
-    qty: oldQty + 1,
-    updatedAt: serverTimestamp(),
-  });
-}
+          return;
+        }
+
+        // ===============================
+        // 其他一般商品：進 inventory
+        // ===============================
+        if (!invSnap.exists()) {
+          const safeIcon = String(item.icon || "");
+          const iconToStore = safeIcon.startsWith("/") ? safeIcon : "";
+
+          tx.set(inventoryRef, {
+            itemId: item.id,
+            name: item.name || "",
+            category,
+            icon: iconToStore,
+            qty: 1,
+            acquiredAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          const oldQty = Number(invSnap.data()?.qty || 0);
+          tx.update(inventoryRef, {
+            qty: oldQty + 1,
+            updatedAt: serverTimestamp(),
+          });
+        }
       });
 
       alert(`✅ 購買成功：${item.name}（-${price} 妖丹）`);
